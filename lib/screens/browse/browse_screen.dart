@@ -1,0 +1,321 @@
+import 'package:flutter/material.dart';
+import 'package:queless/models/product.dart';
+import 'package:queless/services/product_service.dart';
+import 'package:queless/screens/product/product_detail_screen.dart';
+import 'package:queless/utils/formatters.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+
+class BrowseScreen extends StatefulWidget {
+  final ProductType productType;
+
+  const BrowseScreen({
+    super.key,
+    this.productType = ProductType.alcohol,
+  });
+
+  @override
+  State<BrowseScreen> createState() => _BrowseScreenState();
+}
+
+class _BrowseScreenState extends State<BrowseScreen> {
+  final _productService = ProductService();
+  final _searchController = TextEditingController();
+  List<Product> _products = [];
+  List<Product> _filteredProducts = [];
+  bool _isLoading = true;
+  ProductCategory? _selectedCategory;
+
+  // Dynamically derived categories from the loaded products
+  List<ProductCategory> _availableCategories = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProducts();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadProducts() async {
+    setState(() => _isLoading = true);
+    try {
+      final allProducts = await _productService.getAllProducts();
+      final filteredByType = allProducts
+          .where((p) => p.productType == widget.productType)
+          .toList();
+
+      // Extract available categories from the filtered products
+      final categories = filteredByType.map((p) => p.category).toSet().toList();
+      categories.sort((a, b) => a.index.compareTo(b.index));
+
+      setState(() {
+        _products = filteredByType;
+        _filteredProducts = filteredByType;
+        _availableCategories = categories;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  void _filterProducts() {
+    final query = _searchController.text.toLowerCase();
+    setState(() {
+      _filteredProducts = _products.where((product) {
+        final matchesSearch = query.isEmpty ||
+            product.name.toLowerCase().contains(query) ||
+            (product.brand?.toLowerCase().contains(query) ?? false);
+        final matchesCategory =
+            _selectedCategory == null || product.category == _selectedCategory;
+        return matchesSearch && matchesCategory;
+      }).toList();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Browse Products')),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: TextField(
+              controller: _searchController,
+              decoration: const InputDecoration(
+                hintText: 'Search products, brands...',
+                prefixIcon: Icon(Icons.search),
+              ),
+              onChanged: (_) => _filterProducts(),
+            ),
+          ),
+          SizedBox(
+            height: 50,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              children: [
+                FilterChip(
+                  label: const Text('All'),
+                  selected: _selectedCategory == null,
+                  onSelected: (_) => setState(() {
+                    _selectedCategory = null;
+                    _filterProducts();
+                  }),
+                ),
+                const SizedBox(width: 8),
+                ..._availableCategories.map((category) => Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: FilterChip(
+                        label: Text(category.displayName),
+                        selected: _selectedCategory == category,
+                        onSelected: (_) => setState(() {
+                          _selectedCategory = category;
+                          _filterProducts();
+                        }),
+                      ),
+                    )),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _filteredProducts.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.search_off,
+                                size: 80,
+                                color: theme.colorScheme.onSurface
+                                    .withValues(alpha: 0.3)),
+                            const SizedBox(height: 16),
+                            Text('No products found',
+                                style: theme.textTheme.titleMedium),
+                          ],
+                        ),
+                      )
+                    : GridView.builder(
+                        padding: const EdgeInsets.all(20),
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          childAspectRatio: 0.7,
+                          crossAxisSpacing: 16,
+                          mainAxisSpacing: 16,
+                        ),
+                        itemCount: _filteredProducts.length,
+                        itemBuilder: (context, index) =>
+                            ProductGridItem(product: _filteredProducts[index]),
+                      ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class ProductGridItem extends StatefulWidget {
+  final Product product;
+
+  const ProductGridItem({super.key, required this.product});
+
+  @override
+  State<ProductGridItem> createState() => _ProductGridItemState();
+}
+
+class _ProductGridItemState extends State<ProductGridItem> {
+  bool _isHovering = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final textColor =
+        _isHovering ? theme.colorScheme.secondary : theme.colorScheme.onSurface;
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovering = true),
+      onExit: (_) => setState(() => _isHovering = false),
+      child: GestureDetector(
+        onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+                builder: (_) => ProductDetailScreen(product: widget.product))),
+        child: Card(
+          color: Colors.white,
+          elevation: 2,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(
+              color: theme.colorScheme.outline.withValues(alpha: 0.1),
+              width: 1,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: widget.product.imageUrl.isNotEmpty
+                    ? CachedNetworkImage(
+                        imageUrl: widget.product.imageUrl,
+                        imageBuilder: (context, imageProvider) => Container(
+                          padding: const EdgeInsets.only(top: 16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: const BorderRadius.vertical(
+                                top: Radius.circular(12)),
+                          ),
+                          child: Image(
+                            image: imageProvider,
+                            fit: BoxFit.contain,
+                            width: double.infinity,
+                          ),
+                        ),
+                        placeholder: (context, url) => Container(
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.surfaceContainerHighest,
+                            borderRadius: const BorderRadius.vertical(
+                                top: Radius.circular(12)),
+                          ),
+                          child: Center(
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: theme.colorScheme.onSurface
+                                  .withValues(alpha: 0.3),
+                            ),
+                          ),
+                        ),
+                        errorWidget: (context, url, error) => Container(
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.surfaceContainerHighest,
+                            borderRadius: const BorderRadius.vertical(
+                                top: Radius.circular(12)),
+                          ),
+                          child: Center(
+                            child: Icon(Icons.local_bar,
+                                size: 56,
+                                color: theme.colorScheme.onSurface
+                                    .withValues(alpha: 0.3)),
+                          ),
+                        ),
+                      )
+                    : Container(
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surfaceContainerHighest,
+                          borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(12)),
+                        ),
+                        child: Center(
+                          child: Icon(Icons.local_bar,
+                              size: 56,
+                              color: theme.colorScheme.onSurface
+                                  .withValues(alpha: 0.3)),
+                        ),
+                      ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (widget.product.isLocalBrand) ...[
+                      Row(
+                        children: [
+                          Icon(Icons.flag,
+                              size: 12,
+                              color: _isHovering
+                                  ? theme.colorScheme.secondary
+                                  : Colors.green),
+                          const SizedBox(width: 4),
+                          Text('Local',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                  color: _isHovering
+                                      ? theme.colorScheme.secondary
+                                      : Colors.green,
+                                  fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                    ],
+                    Text(
+                      widget.product.name,
+                      style: theme.textTheme.titleSmall
+                          ?.copyWith(color: textColor),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    if (widget.product.volume != null)
+                      Text(
+                        widget.product.volume!,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                            color: _isHovering
+                                ? theme.colorScheme.secondary
+                                : theme.colorScheme.onSurface
+                                    .withValues(alpha: 0.6)),
+                      ),
+                    const SizedBox(height: 8),
+                    Text(
+                      Formatters.formatCurrency(widget.product.price),
+                      style: theme.textTheme.titleMedium?.copyWith(
+                          color: textColor, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
