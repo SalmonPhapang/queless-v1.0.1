@@ -3,6 +3,7 @@ import 'package:queless/services/cart_service.dart';
 import 'package:queless/services/food_cart_service.dart';
 import 'package:queless/screens/cart/checkout_screen.dart';
 import 'package:queless/utils/formatters.dart';
+import 'package:queless/utils/snack_bar_helper.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 class CartScreen extends StatefulWidget {
@@ -205,15 +206,12 @@ class _CartDetailScreenState extends State<CartDetailScreen> {
         : _cartService.calculateDiscount();
     if (mounted) {
       if (discount > 0) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(
-                  'Promo code applied! You saved ${Formatters.formatCurrency(discount)}')),
+        SnackBarHelper.showSuccess(
+          context,
+          'Promo code applied! You saved ${Formatters.formatCurrency(discount)}',
         );
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Invalid promo code')),
-        );
+        SnackBarHelper.showError(context, 'Invalid promo code');
       }
     }
   }

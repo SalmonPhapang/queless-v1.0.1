@@ -51,7 +51,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyB8zC-py4oEjMRQE1ewibCcET9I7QIqjbs',
-    appId: '1:1010661119110:android:df5b25be5732e9c80d2d07',
+    appId: '1:1010661119110:android:14cd7d02df5af4340d2d07',
     messagingSenderId: '1010661119110',
     projectId: 'queless-51e15',
     storageBucket: 'queless-51e15.firebasestorage.app',

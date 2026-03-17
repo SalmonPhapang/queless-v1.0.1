@@ -4,6 +4,8 @@ import 'package:queless/services/product_service.dart';
 import 'package:queless/screens/product/product_detail_screen.dart';
 import 'package:queless/utils/formatters.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:queless/services/promotion_service.dart';
+import 'package:queless/widgets/promo_badge.dart';
 
 class CategoryScreen extends StatefulWidget {
   final ProductCategory category;
@@ -16,13 +18,21 @@ class CategoryScreen extends StatefulWidget {
 
 class _CategoryScreenState extends State<CategoryScreen> {
   final _productService = ProductService();
+  final _promotionService = PromotionService();
   List<Product> _products = [];
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadProducts();
+    _initData();
+  }
+
+  Future<void> _initData() async {
+    await Future.wait([
+      _loadProducts(),
+      _promotionService.refreshActivePromotions(),
+    ]);
   }
 
   Future<void> _loadProducts() async {
@@ -86,6 +96,7 @@ class _HoverProductCardState extends State<_HoverProductCard> {
     final theme = Theme.of(context);
     final textColor =
         _isHovering ? theme.colorScheme.secondary : theme.colorScheme.onSurface;
+    final promoService = PromotionService();
 
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovering = true),
@@ -96,7 +107,8 @@ class _HoverProductCardState extends State<_HoverProductCard> {
             MaterialPageRoute(
                 builder: (_) => ProductDetailScreen(product: widget.product))),
         child: Card(
-          color: Colors.white,
+          clipBehavior: Clip.antiAlias,
+          color: theme.colorScheme.surface,
           elevation: 2,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
@@ -109,62 +121,78 @@ class _HoverProductCardState extends State<_HoverProductCard> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: widget.product.imageUrl.isNotEmpty
-                    ? CachedNetworkImage(
-                        imageUrl: widget.product.imageUrl,
-                        imageBuilder: (context, imageProvider) => Container(
-                          padding: const EdgeInsets.only(top: 16),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: const BorderRadius.vertical(
-                                top: Radius.circular(16)),
-                          ),
-                          child: Image(
-                            image: imageProvider,
-                            fit: BoxFit.contain,
-                            width: double.infinity,
-                          ),
-                        ),
-                        placeholder: (context, url) => Container(
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.surfaceContainerHighest,
-                            borderRadius: const BorderRadius.vertical(
-                                top: Radius.circular(16)),
-                          ),
-                          child: Center(
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: theme.colorScheme.primary
-                                  .withValues(alpha: 0.3),
+                child: AnimatedBuilder(
+                  animation: promoService,
+                  builder: (context, _) {
+                    final promo =
+                        promoService.promotionForProduct(widget.product.id);
+
+                    final image = widget.product.imageUrl.isNotEmpty
+                        ? CachedNetworkImage(
+                            imageUrl: widget.product.imageUrl,
+                            imageBuilder: (context, imageProvider) => Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.surface,
+                              ),
+                              child: SizedBox.expand(
+                                child: Image(
+                                  image: imageProvider,
+                                  fit: BoxFit.contain,
+                                ),
+                              ),
                             ),
+                            placeholder: (context, url) => Container(
+                              decoration: BoxDecoration(
+                                color:
+                                    theme.colorScheme.surfaceContainerHighest,
+                              ),
+                              child: Center(
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: theme.colorScheme.primary
+                                      .withValues(alpha: 0.3),
+                                ),
+                              ),
+                            ),
+                            errorWidget: (context, url, error) => Container(
+                              decoration: BoxDecoration(
+                                color:
+                                    theme.colorScheme.surfaceContainerHighest,
+                              ),
+                              child: Center(
+                                child: Icon(Icons.local_bar,
+                                    size: 56,
+                                    color: theme.colorScheme.onSurface
+                                        .withValues(alpha: 0.3)),
+                              ),
+                            ),
+                          )
+                        : Container(
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.surfaceContainerHighest,
+                            ),
+                            child: Center(
+                              child: Icon(Icons.local_bar,
+                                  size: 56,
+                                  color: theme.colorScheme.onSurface
+                                      .withValues(alpha: 0.3)),
+                            ),
+                          );
+
+                    return Stack(
+                      children: [
+                        Positioned.fill(child: image),
+                        if (promo != null)
+                          Positioned(
+                            top: 12,
+                            left: 12,
+                            child: PromoBadge(text: promo.badgeText),
                           ),
-                        ),
-                        errorWidget: (context, url, error) => Container(
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.surfaceContainerHighest,
-                            borderRadius: const BorderRadius.vertical(
-                                top: Radius.circular(16)),
-                          ),
-                          child: Center(
-                            child: Icon(Icons.local_bar,
-                                size: 56,
-                                color: theme.colorScheme.onSurface
-                                    .withValues(alpha: 0.3)),
-                          ),
-                        ),
-                      )
-                    : Container(
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.surfaceContainerHighest,
-                          borderRadius: const BorderRadius.vertical(
-                              top: Radius.circular(16)),
-                        ),
-                        child: Center(
-                            child: Icon(Icons.local_bar,
-                                size: 56,
-                                color: theme.colorScheme.onSurface
-                                    .withValues(alpha: 0.3))),
-                      ),
+                      ],
+                    );
+                  },
+                ),
               ),
               Padding(
                 padding: const EdgeInsets.all(12),

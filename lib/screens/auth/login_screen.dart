@@ -4,6 +4,7 @@ import 'package:queless/services/auth_service.dart';
 import 'package:queless/screens/auth/signup_screen.dart';
 import 'package:queless/screens/onboarding/onboarding_screen.dart';
 import 'package:queless/screens/auth/age_verification_screen.dart';
+import 'package:queless/screens/auth/permission_request_screen.dart';
 import 'package:queless/screens/main_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -43,11 +44,14 @@ class _LoginScreenState extends State<LoginScreen> {
         // Mark that user has logged in
         final prefs = await SharedPreferences.getInstance();
         await prefs.setBool('has_logged_in', true);
-        
+
         // Check if onboarding has been completed
-        final onboardingComplete = prefs.getBool('onboarding_complete') ?? false;
+        final onboardingComplete =
+            prefs.getBool('onboarding_complete') ?? false;
+        final permissionsRequested =
+            prefs.getBool('permissions_requested') ?? false;
         final needsAgeVerification = user.ageVerified == false;
-        
+
         if (!onboardingComplete) {
           // First time login - show onboarding
           Navigator.of(context).pushAndRemoveUntil(
@@ -59,8 +63,14 @@ class _LoginScreenState extends State<LoginScreen> {
             MaterialPageRoute(builder: (_) => const AgeVerificationScreen()),
             (route) => false,
           );
+        } else if (!permissionsRequested) {
+          // Onboarding complete, but permissions not yet requested
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const PermissionRequestScreen()),
+            (route) => false,
+          );
         } else {
-          // Returning, fully onboarded and age-verified user - go straight to main app
+          // Returning, fully onboarded, age-verified and permission-requested user - go straight to main app
           Navigator.of(context).pushAndRemoveUntil(
             MaterialPageRoute(builder: (_) => const MainScreen()),
             (route) => false,
@@ -97,12 +107,15 @@ class _LoginScreenState extends State<LoginScreen> {
               children: [
                 Text(
                   'Welcome Back',
-                  style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
+                  style: theme.textTheme.headlineMedium
+                      ?.copyWith(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   'Sign in to continue ordering',
-                  style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                      color:
+                          theme.colorScheme.onSurface.withValues(alpha: 0.6)),
                 ),
                 const SizedBox(height: 48),
                 TextFormField(
@@ -114,8 +127,12 @@ class _LoginScreenState extends State<LoginScreen> {
                   keyboardType: TextInputType.emailAddress,
                   textInputAction: TextInputAction.next,
                   validator: (value) {
-                    if (value == null || value.trim().isEmpty) return 'Please enter your email';
-                    if (!value.contains('@')) return 'Please enter a valid email';
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Please enter your email';
+                    }
+                    if (!value.contains('@')) {
+                      return 'Please enter a valid email';
+                    }
                     return null;
                   },
                 ),
@@ -126,14 +143,19 @@ class _LoginScreenState extends State<LoginScreen> {
                     labelText: 'Password',
                     prefixIcon: const Icon(Icons.lock_outline),
                     suffixIcon: IconButton(
-                      icon: Icon(_obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined),
-                      onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                      icon: Icon(_obscurePassword
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined),
+                      onPressed: () =>
+                          setState(() => _obscurePassword = !_obscurePassword),
                     ),
                   ),
                   obscureText: _obscurePassword,
                   textInputAction: TextInputAction.done,
                   validator: (value) {
-                    if (value == null || value.isEmpty) return 'Please enter your password';
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter your password';
+                    }
                     return null;
                   },
                   onFieldSubmitted: (_) => _handleLogin(),
@@ -144,7 +166,10 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: ElevatedButton(
                     onPressed: _isLoading ? null : _handleLogin,
                     child: _isLoading
-                        ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2))
                         : const Text('Sign In'),
                   ),
                 ),
@@ -153,7 +178,10 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: TextButton(
                     onPressed: () {
                       Navigator.pop(context);
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const SignupScreen()));
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => const SignupScreen()));
                     },
                     child: const Text('Don\'t have an account? Sign Up'),
                   ),

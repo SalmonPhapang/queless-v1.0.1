@@ -7,9 +7,9 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:1010661119110:android:df5b25be5732e9c80d2d07",
+        "mobilesdk_app_id": "1:1010661119110:android:01fdf328af6b7ade0d2d07",
         "android_client_info": {
-          "package_name": "com.mycompany.CounterApp"
+          "package_name": "com.queless"
         }
       },
       "oauth_client": [],
@@ -26,9 +26,9 @@
     },
     {
       "client_info": {
-        "mobilesdk_app_id": "1:1010661119110:android:01fdf328af6b7ade0d2d07",
+        "mobilesdk_app_id": "1:1010661119110:android:14cd7d02df5af4340d2d07",
         "android_client_info": {
-          "package_name": "com.queless"
+          "package_name": "com.queless.app"
         }
       },
       "oauth_client": [],

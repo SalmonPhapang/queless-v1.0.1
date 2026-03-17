@@ -3,7 +3,10 @@ import 'package:queless/models/store.dart';
 import 'package:queless/models/product.dart';
 import 'package:queless/services/product_service.dart';
 import 'package:queless/services/food_cart_service.dart';
+import 'package:queless/utils/snack_bar_helper.dart';
+import 'package:queless/services/promotion_service.dart';
 import 'package:queless/utils/formatters.dart';
+import 'package:queless/widgets/promo_badge.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 class StoreDetailScreen extends StatefulWidget {
@@ -92,6 +95,7 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final promoService = PromotionService();
 
     return Scaffold(
       body: CustomScrollView(
@@ -100,14 +104,84 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
             expandedHeight: 200,
             pinned: true,
             flexibleSpace: FlexibleSpaceBar(
-              title: Text(widget.store.name),
-              background: Container(
-                color: theme.colorScheme.surfaceContainerHighest,
-                child: Center(
-                  child: Icon(Icons.restaurant_menu,
-                      size: 80,
-                      color: theme.colorScheme.primary.withValues(alpha: 0.3)),
+              title: Text(
+                widget.store.name,
+                style: const TextStyle(
+                  color: Colors.white,
+                  shadows: [
+                    Shadow(
+                      offset: Offset(0, 1),
+                      blurRadius: 4.0,
+                      color: Colors.black54,
+                    ),
+                  ],
                 ),
+              ),
+              background: AnimatedBuilder(
+                animation: promoService,
+                builder: (context, _) {
+                  final promo = promoService.promotionForStore(widget.store.id);
+
+                  final image = widget.store.imageUrl.isNotEmpty
+                      ? CachedNetworkImage(
+                          imageUrl: widget.store.imageUrl,
+                          fit: BoxFit.cover,
+                          placeholder: (context, url) => Container(
+                            color: theme.colorScheme.surfaceContainerHighest,
+                            child: Center(
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: theme.colorScheme.primary
+                                    .withValues(alpha: 0.3),
+                              ),
+                            ),
+                          ),
+                          errorWidget: (context, url, error) => Container(
+                            color: theme.colorScheme.surfaceContainerHighest,
+                            child: Center(
+                              child: Icon(Icons.restaurant_menu,
+                                  size: 80,
+                                  color: theme.colorScheme.primary
+                                      .withValues(alpha: 0.3)),
+                            ),
+                          ),
+                        )
+                      : Container(
+                          color: theme.colorScheme.surfaceContainerHighest,
+                          child: Center(
+                            child: Icon(Icons.restaurant_menu,
+                                size: 80,
+                                color: theme.colorScheme.primary
+                                    .withValues(alpha: 0.3)),
+                          ),
+                        );
+
+                  return Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      image,
+                      // Overlay to ensure title readability
+                      const DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              Colors.black54,
+                            ],
+                          ),
+                        ),
+                      ),
+                      if (promo != null)
+                        Positioned(
+                          top: MediaQuery.of(context).padding.top + 50,
+                          left: 16,
+                          child: PromoBadge(text: promo.badgeText),
+                        ),
+                    ],
+                  );
+                },
               ),
             ),
           ),
@@ -203,6 +277,7 @@ class FoodProductCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final promoService = PromotionService();
 
     return InkWell(
       onTap: () {
@@ -220,61 +295,83 @@ class FoodProductCard extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              product.imageUrl.isNotEmpty
-                  ? CachedNetworkImage(
-                      imageUrl: product.imageUrl,
-                      imageBuilder: (context, imageProvider) => Container(
-                        width: 80,
-                        height: 80,
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(12),
-                          image: DecorationImage(
-                            image: imageProvider,
-                            fit: BoxFit.contain,
+              AnimatedBuilder(
+                animation: promoService,
+                builder: (context, _) {
+                  final promo = promoService.promotionForProduct(product.id);
+
+                  final image = product.imageUrl.isNotEmpty
+                      ? CachedNetworkImage(
+                          imageUrl: product.imageUrl,
+                          imageBuilder: (context, imageProvider) => Container(
+                            width: 80,
+                            height: 80,
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.surfaceContainerHighest,
+                              borderRadius: BorderRadius.circular(12),
+                              image: DecorationImage(
+                                image: imageProvider,
+                                fit: BoxFit.contain,
+                              ),
+                            ),
+                          ),
+                          placeholder: (context, url) => Container(
+                            width: 80,
+                            height: 80,
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.surfaceContainerHighest,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Center(
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: theme.colorScheme.primary
+                                    .withValues(alpha: 0.3),
+                              ),
+                            ),
+                          ),
+                          errorWidget: (context, url, error) => Container(
+                            width: 80,
+                            height: 80,
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.surfaceContainerHighest,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(Icons.fastfood,
+                                size: 32,
+                                color: theme.colorScheme.primary
+                                    .withValues(alpha: 0.5)),
+                          ),
+                        )
+                      : Container(
+                          width: 80,
+                          height: 80,
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.surfaceContainerHighest,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(Icons.fastfood,
+                              size: 32,
+                              color: theme.colorScheme.primary
+                                  .withValues(alpha: 0.5)),
+                        );
+
+                  return Stack(
+                    children: [
+                      image,
+                      if (promo != null)
+                        Positioned(
+                          top: 4,
+                          left: 4,
+                          child: Transform.scale(
+                            scale: 0.8,
+                            child: PromoBadge(text: promo.badgeText),
                           ),
                         ),
-                      ),
-                      placeholder: (context, url) => Container(
-                        width: 80,
-                        height: 80,
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Center(
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: theme.colorScheme.primary
-                                .withValues(alpha: 0.3),
-                          ),
-                        ),
-                      ),
-                      errorWidget: (context, url, error) => Container(
-                        width: 80,
-                        height: 80,
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(Icons.fastfood,
-                            size: 32,
-                            color: theme.colorScheme.primary
-                                .withValues(alpha: 0.5)),
-                      ),
-                    )
-                  : Container(
-                      width: 80,
-                      height: 80,
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(Icons.fastfood,
-                          size: 32,
-                          color:
-                              theme.colorScheme.primary.withValues(alpha: 0.5)),
-                    ),
+                    ],
+                  );
+                },
+              ),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
@@ -390,9 +487,7 @@ class _FoodProductDetailScreenState extends State<FoodProductDetailScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
-        );
+        SnackBarHelper.showError(context, e.toString());
       }
     } finally {
       if (mounted) {
@@ -404,6 +499,7 @@ class _FoodProductDetailScreenState extends State<FoodProductDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final promoService = PromotionService();
 
     return Scaffold(
       appBar: AppBar(
@@ -417,51 +513,75 @@ class _FoodProductDetailScreenState extends State<FoodProductDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  widget.product.imageUrl.isNotEmpty
-                      ? CachedNetworkImage(
-                          imageUrl: widget.product.imageUrl,
-                          imageBuilder: (context, imageProvider) => Container(
-                            height: 300,
-                            decoration: BoxDecoration(
+                  AnimatedBuilder(
+                    animation: promoService,
+                    builder: (context, _) {
+                      final promo =
+                          promoService.promotionForProduct(widget.product.id);
+
+                      final image = widget.product.imageUrl.isNotEmpty
+                          ? CachedNetworkImage(
+                              imageUrl: widget.product.imageUrl,
+                              imageBuilder: (context, imageProvider) =>
+                                  Container(
+                                height: 300,
+                                decoration: BoxDecoration(
+                                  color:
+                                      theme.colorScheme.surfaceContainerHighest,
+                                  image: DecorationImage(
+                                    image: imageProvider,
+                                    fit: BoxFit.contain,
+                                  ),
+                                ),
+                              ),
+                              placeholder: (context, url) => Container(
+                                height: 300,
+                                color:
+                                    theme.colorScheme.surfaceContainerHighest,
+                                child: Center(
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: theme.colorScheme.primary
+                                        .withValues(alpha: 0.3),
+                                  ),
+                                ),
+                              ),
+                              errorWidget: (context, url, error) => Container(
+                                height: 300,
+                                color:
+                                    theme.colorScheme.surfaceContainerHighest,
+                                child: Center(
+                                  child: Icon(Icons.fastfood,
+                                      size: 100,
+                                      color: theme.colorScheme.primary
+                                          .withValues(alpha: 0.3)),
+                                ),
+                              ),
+                            )
+                          : Container(
+                              height: 300,
                               color: theme.colorScheme.surfaceContainerHighest,
-                              image: DecorationImage(
-                                image: imageProvider,
-                                fit: BoxFit.contain,
+                              child: Center(
+                                child: Icon(Icons.fastfood,
+                                    size: 100,
+                                    color: theme.colorScheme.primary
+                                        .withValues(alpha: 0.3)),
                               ),
+                            );
+
+                      return Stack(
+                        children: [
+                          image,
+                          if (promo != null)
+                            Positioned(
+                              top: 20,
+                              left: 20,
+                              child: PromoBadge(text: promo.badgeText),
                             ),
-                          ),
-                          placeholder: (context, url) => Container(
-                            height: 300,
-                            color: theme.colorScheme.surfaceContainerHighest,
-                            child: Center(
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: theme.colorScheme.primary
-                                    .withValues(alpha: 0.3),
-                              ),
-                            ),
-                          ),
-                          errorWidget: (context, url, error) => Container(
-                            height: 300,
-                            color: theme.colorScheme.surfaceContainerHighest,
-                            child: Center(
-                              child: Icon(Icons.fastfood,
-                                  size: 120,
-                                  color: theme.colorScheme.primary
-                                      .withValues(alpha: 0.5)),
-                            ),
-                          ),
-                        )
-                      : Container(
-                          height: 300,
-                          color: theme.colorScheme.surfaceContainerHighest,
-                          child: Center(
-                            child: Icon(Icons.fastfood,
-                                size: 120,
-                                color: theme.colorScheme.primary
-                                    .withValues(alpha: 0.5)),
-                          ),
-                        ),
+                        ],
+                      );
+                    },
+                  ),
                   Padding(
                     padding: const EdgeInsets.all(20),
                     child: Column(
@@ -596,8 +716,17 @@ class _FoodProductDetailScreenState extends State<FoodProductDetailScreen> {
                         : const Icon(Icons.shopping_cart_outlined),
                     label: _isAdding
                         ? const SizedBox.shrink()
-                        : Text(
-                            'Add • ${Formatters.formatCurrency(widget.product.price * _quantity)}'),
+                        : FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              'Add • ${Formatters.formatCurrency(widget.product.price * _quantity)}',
+                              maxLines: 1,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
                   ),
                 ),
               ],

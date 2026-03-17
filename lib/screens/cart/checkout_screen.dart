@@ -10,6 +10,7 @@ import 'package:queless/screens/orders/order_tracking_screen.dart';
 import 'package:queless/screens/payments/paystack_payment_screen.dart';
 import 'package:queless/screens/profile/address_management_screen.dart';
 import 'package:queless/utils/formatters.dart';
+import 'package:queless/utils/snack_bar_helper.dart';
 import 'package:queless/utils/compliance_helper.dart';
 
 class CheckoutScreen extends StatefulWidget {
@@ -173,14 +174,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text(
-              'Something went wrong while placing your order. '
-              'Please try again.',
-            ),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
+        SnackBarHelper.showError(
+          context,
+          'Something went wrong while placing your order. Please try again.',
         );
       }
     } finally {
@@ -545,14 +541,9 @@ class _FoodCheckoutScreenState extends State<FoodCheckoutScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text(
-              'Something went wrong while placing your order. '
-              'Please try again.',
-            ),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
+        SnackBarHelper.showError(
+          context,
+          'Something went wrong while placing your order. Please try again.',
         );
       }
     } finally {

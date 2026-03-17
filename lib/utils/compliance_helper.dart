@@ -129,4 +129,59 @@ We comply with all South African liquor laws and regulations, including:
 
 For license verification or queries, contact: compliance@queless.co.za
 ''';
+
+  static const String privacyPolicy = '''
+PRIVACY POLICY
+Last Updated: 13 March 2026
+
+1. INTRODUCTION
+Queless ("we," "us," or "our") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, and disclose your personal information.
+
+2. INFORMATION WE COLLECT
+• Personal Information: Name, email address, phone number, and delivery address.
+• Age Verification: We collect identification documents to verify you are 18+.
+• Location Data: We use your location to provide delivery services and enforce provincial trading hours.
+• Payment Information: We process payments through secure third-party gateways (Ozow, PayFast).
+
+3. HOW WE USE YOUR INFORMATION
+• To process and deliver your orders.
+• To verify your age for alcohol purchases.
+• To communicate with you about your orders.
+• To comply with South African liquor laws and regulations.
+
+4. DATA SECURITY
+We implement industry-standard security measures to protect your data. Your identification documents are stored securely and only accessible to authorized personnel.
+
+5. DATA DELETION
+You have the right to request the deletion of your account and personal data at any time through the app settings.
+
+6. CONTACT US
+If you have any questions, contact us at privacy@queless.co.za
+''';
+
+  static const String termsOfService = '''
+TERMS OF SERVICE
+Last Updated: 13 March 2026
+
+1. ACCEPTANCE OF TERMS
+By using Queless, you agree to these Terms of Service and all applicable South African laws.
+
+2. AGE RESTRICTION
+You must be at least 18 years of age to use this app and purchase alcohol. We strictly enforce age verification through identification document uploads.
+
+3. TRADING HOURS
+Alcohol sales are subject to provincial trading hours and restrictions. We do not process orders outside of legal trading hours for your province.
+
+4. RESPONSIBLE DRINKING
+We support responsible drinking. We reserve the right to refuse service to anyone appearing intoxicated or attempting to purchase alcohol for minors.
+
+5. DELIVERY
+Delivery is only available within supported areas in South Africa. You must be present to receive the order and provide proof of age if requested.
+
+6. CANCELLATIONS AND REFUNDS
+Orders can be cancelled before they are dispatched. Refunds are subject to our refund policy and provincial regulations.
+
+7. LIMITATION OF LIABILITY
+Queless is not liable for any misuse of alcohol or failure to comply with local laws by the user.
+''';
 }

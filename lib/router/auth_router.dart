@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:queless/screens/auth/welcome_screen.dart';
 import 'package:queless/screens/auth/age_verification_screen.dart';
+import 'package:queless/screens/auth/permission_request_screen.dart';
 import 'package:queless/screens/main_screen.dart';
 import 'package:queless/screens/onboarding/onboarding_screen.dart';
 import 'package:queless/services/auth_service.dart';
@@ -42,12 +43,16 @@ class _AuthRouterState extends State<AuthRouter> {
 
       // Authenticated: decide between onboarding and main app
       final onboardingComplete = prefs.getBool('onboarding_complete') ?? false;
+      final permissionsRequested =
+          prefs.getBool('permissions_requested') ?? false;
       debugPrint('🔀 Auth Router - onboardingComplete: $onboardingComplete');
 
       if (!onboardingComplete) {
         _initialRoute = const OnboardingScreen();
       } else if (user != null && !user.ageVerified) {
         _initialRoute = const AgeVerificationScreen();
+      } else if (!permissionsRequested) {
+        _initialRoute = const PermissionRequestScreen();
       } else {
         _initialRoute = const MainScreen();
       }

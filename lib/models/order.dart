@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:queless/models/product.dart';
 import 'package:queless/models/user.dart';
 
@@ -74,12 +75,12 @@ class OrderItem {
       };
 
   factory OrderItem.fromJson(Map<String, dynamic> json) => OrderItem(
-        productId: json['product_id'] as String,
-        productName: json['product_name'] as String,
-        productImageUrl: json['product_image_url'] as String,
-        quantity: json['quantity'] as int,
-        pricePerUnit: (json['price_per_unit'] as num).toDouble(),
-        totalPrice: (json['total_price'] as num).toDouble(),
+        productId: json['product_id']?.toString() ?? '',
+        productName: json['product_name']?.toString() ?? 'Unknown Product',
+        productImageUrl: json['product_image_url']?.toString() ?? '',
+        quantity: (json['quantity'] as num?)?.toInt() ?? 0,
+        pricePerUnit: (json['price_per_unit'] as num?)?.toDouble() ?? 0.0,
+        totalPrice: (json['total_price'] as num?)?.toDouble() ?? 0.0,
       );
 
   factory OrderItem.fromProduct(Product product, int quantity) => OrderItem(
@@ -142,6 +143,7 @@ class DriverInfo {
 
 class Order {
   final String id;
+  final String orderNumber;
   final String userId;
   final List<OrderItem> items;
   final double subtotal;
@@ -162,8 +164,11 @@ class Order {
   final DateTime updatedAt;
   final String? storeId;
 
+  String get orderType => storeId != null ? 'Food' : 'Alcohol';
+
   Order({
     required this.id,
+    required this.orderNumber,
     required this.userId,
     required this.items,
     required this.subtotal,
@@ -187,6 +192,7 @@ class Order {
 
   Map<String, dynamic> toJson() => {
         'id': id,
+        'order_number': orderNumber,
         'user_id': userId,
         'items': items.map((i) => i.toJson()).toList(),
         'subtotal': subtotal,
@@ -208,41 +214,62 @@ class Order {
         'store_id': storeId,
       };
 
-  factory Order.fromJson(Map<String, dynamic> json) => Order(
-        id: json['id'] as String,
-        userId: json['user_id'] as String,
-        items: (json['items'] as List)
-            .map((i) => OrderItem.fromJson(i as Map<String, dynamic>))
-            .toList(),
-        subtotal: (json['subtotal'] as num).toDouble(),
-        deliveryFee: (json['delivery_fee'] as num).toDouble(),
-        discount: (json['discount'] as num).toDouble(),
-        total: (json['total'] as num).toDouble(),
-        status: OrderStatus.values.firstWhere((e) => e.name == json['status']),
-        deliveryAddress:
-            Address.fromJson(json['delivery_address'] as Map<String, dynamic>),
-        paymentMethod: json['payment_method'] as String,
-        paymentStatus: PaymentStatus.values
-            .firstWhere((e) => e.name == json['payment_status']),
+  factory Order.fromJson(Map<String, dynamic> json) {
+    try {
+      return Order(
+        id: json['id']?.toString() ?? '',
+        orderNumber: json['order_number']?.toString() ?? '',
+        userId: json['user_id']?.toString() ?? '',
+        items: (json['items'] as List?)
+                ?.map((i) => OrderItem.fromJson(i as Map<String, dynamic>))
+                .toList() ??
+            [],
+        subtotal: (json['subtotal'] as num?)?.toDouble() ?? 0.0,
+        deliveryFee: (json['delivery_fee'] as num?)?.toDouble() ?? 0.0,
+        discount: (json['discount'] as num?)?.toDouble() ?? 0.0,
+        total: (json['total'] as num?)?.toDouble() ?? 0.0,
+        status: OrderStatus.values.firstWhere(
+          (e) =>
+              e.name.toLowerCase() == json['status']?.toString().toLowerCase(),
+          orElse: () => OrderStatus.pending,
+        ),
+        deliveryAddress: Address.fromJson(
+            (json['delivery_address'] as Map<String, dynamic>?) ?? {}),
+        paymentMethod: json['payment_method']?.toString() ?? 'Unknown',
+        paymentStatus: PaymentStatus.values.firstWhere(
+          (e) =>
+              e.name.toLowerCase() ==
+              json['payment_status']?.toString().toLowerCase(),
+          orElse: () => PaymentStatus.pending,
+        ),
         scheduledDelivery: json['scheduled_delivery'] != null
-            ? DateTime.parse(json['scheduled_delivery'] as String)
+            ? DateTime.tryParse(json['scheduled_delivery'].toString())
             : null,
-        trackingUpdates: (json['tracking_updates'] as List)
-            .map((t) => TrackingUpdate.fromJson(t as Map<String, dynamic>))
-            .toList(),
-        driverName: json['driver_name'] as String?,
-        driverPhone: json['driver_phone'] as String?,
+        trackingUpdates: (json['tracking_updates'] as List?)
+                ?.map((t) => TrackingUpdate.fromJson(t as Map<String, dynamic>))
+                .toList() ??
+            [],
+        driverName: json['driver_name']?.toString(),
+        driverPhone: json['driver_phone']?.toString(),
         driverLocation: json['driver_location'] as Map<String, dynamic>?,
         estimatedDeliveryTime: json['estimated_delivery_time'] != null
-            ? DateTime.parse(json['estimated_delivery_time'] as String)
+            ? DateTime.tryParse(json['estimated_delivery_time'].toString())
             : null,
-        createdAt: DateTime.parse(json['created_at'] as String),
-        updatedAt: DateTime.parse(json['updated_at'] as String),
-        storeId: json['store_id'] as String?,
+        createdAt: DateTime.tryParse(json['created_at']?.toString() ?? '') ??
+            DateTime.now(),
+        updatedAt: DateTime.tryParse(json['updated_at']?.toString() ?? '') ??
+            DateTime.now(),
+        storeId: json['store_id']?.toString(),
       );
+    } catch (e) {
+      debugPrint('Error parsing Order from JSON: $e');
+      rethrow;
+    }
+  }
 
   Order copyWith({
     String? id,
+    String? orderNumber,
     String? userId,
     List<OrderItem>? items,
     double? subtotal,
@@ -265,6 +292,7 @@ class Order {
   }) =>
       Order(
         id: id ?? this.id,
+        orderNumber: orderNumber ?? this.orderNumber,
         userId: userId ?? this.userId,
         items: items ?? this.items,
         subtotal: subtotal ?? this.subtotal,

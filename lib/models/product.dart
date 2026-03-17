@@ -39,6 +39,8 @@ enum ProductType {
 }
 
 class Product {
+  static const double feeRate = 0.20;
+
   final String id;
   final String name;
   final ProductCategory category;
@@ -100,7 +102,7 @@ class Product {
     ),
     brand: json['brand'] as String?,
     description: json['description'] as String? ?? '',
-    price: (json['price'] as num).toDouble(),
+    price: (json['price'] as num).toDouble() * (1 + feeRate),
     imageUrl: json['image_url'] as String? ?? '',
     alcoholContent: json['alcohol_content'] != null ? (json['alcohol_content'] as num).toDouble() : null,
     volume: json['volume'] as String?,

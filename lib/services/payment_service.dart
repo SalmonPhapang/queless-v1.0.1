@@ -73,6 +73,8 @@ class PaymentService {
         transactionId: transactionId,
       );
 
+      await _syncOrderAfterPayment(paymentId, status);
+
       return await getPaymentById(paymentId);
     } catch (e) {
       debugPrint('Error processing payment: $e');
@@ -112,6 +114,7 @@ class PaymentService {
   }) async {
     final mappedStatus = _mapOzowStatusToPaymentStatus(status);
     await updatePaymentStatus(paymentId: paymentId, status: mappedStatus);
+    await _syncOrderAfterPayment(paymentId, mappedStatus);
   }
 
   String _mapOzowStatusToPaymentStatus(Object status) {
@@ -146,25 +149,48 @@ class PaymentService {
       transactionId: reference,
     );
 
+    await _syncOrderAfterPayment(paymentId, mappedStatus);
+  }
+
+  Future<void> _syncOrderAfterPayment(
+      String paymentId, String mappedStatus) async {
     try {
       final payment = await getPaymentById(paymentId);
-      if (payment == null) return;
+      if (payment == null) {
+        debugPrint('Sync failed: Payment $paymentId not found');
+        return;
+      }
 
       final orderService = OrderService();
-
       final paymentStatusEnum = PaymentStatus.values.firstWhere(
-          (e) => e.name == mappedStatus,
+          (e) => e.name.toLowerCase() == mappedStatus.toLowerCase(),
           orElse: () => PaymentStatus.failed);
+
       await orderService.updateOrderPaymentStatus(
           payment.orderId, paymentStatusEnum);
+
       if (mappedStatus == 'completed') {
         await orderService.updateOrderStatus(
           payment.orderId,
           OrderStatus.preparing,
         );
+        try {
+          final order = await orderService.getOrderById(payment.orderId);
+
+          await SupabaseConfig.client.functions.invoke(
+            'new-order-notify',
+            headers: {
+              'Authorization': 'Bearer ${SupabaseConfig.anonKey}',
+              'apikey': SupabaseConfig.anonKey,
+            },
+            body: {'order_id': payment.orderId, 'store_id': order?.storeId},
+          );
+        } catch (e) {
+          debugPrint('Error invoking new-order-notify: $e');
+        }
       }
     } catch (e) {
-      debugPrint('Error syncing order after Paystack payment: $e');
+      debugPrint('Error syncing order after payment: $e');
     }
   }
 

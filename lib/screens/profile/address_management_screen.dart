@@ -4,13 +4,15 @@ import 'package:geolocator/geolocator.dart';
 import 'package:queless/services/auth_service.dart';
 import 'package:queless/models/user.dart';
 import 'package:queless/utils/compliance_helper.dart';
+import 'package:queless/utils/snack_bar_helper.dart';
 import 'package:uuid/uuid.dart';
 
 class AddressManagementScreen extends StatefulWidget {
   const AddressManagementScreen({super.key});
 
   @override
-  State<AddressManagementScreen> createState() => _AddressManagementScreenState();
+  State<AddressManagementScreen> createState() =>
+      _AddressManagementScreenState();
 }
 
 class _AddressManagementScreenState extends State<AddressManagementScreen> {
@@ -21,6 +23,7 @@ class _AddressManagementScreenState extends State<AddressManagementScreen> {
       context: context,
       isScrollControlled: true,
       builder: (context) => AddressForm(
+        autoDetectOnOpen: true,
         onSave: (address) async {
           await _authService.addAddress(address);
           setState(() {});
@@ -52,7 +55,9 @@ class _AddressManagementScreenState extends State<AddressManagementScreen> {
         title: const Text('Delete Address'),
         content: Text('Are you sure you want to delete ${address.label}?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel')),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             child: const Text('Delete'),
@@ -79,11 +84,18 @@ class _AddressManagementScreenState extends State<AddressManagementScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.location_off_outlined, size: 80, color: theme.colorScheme.onSurface.withValues(alpha: 0.3)),
+                  Icon(Icons.location_off_outlined,
+                      size: 80,
+                      color:
+                          theme.colorScheme.onSurface.withValues(alpha: 0.3)),
                   const SizedBox(height: 16),
-                  Text('No addresses saved', style: theme.textTheme.titleMedium),
+                  Text('No addresses saved',
+                      style: theme.textTheme.titleMedium),
                   const SizedBox(height: 8),
-                  Text('Add your first address to start ordering', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurface.withValues(alpha: 0.6))),
+                  Text('Add your first address to start ordering',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurface
+                              .withValues(alpha: 0.6))),
                 ],
               ),
             )
@@ -95,28 +107,35 @@ class _AddressManagementScreenState extends State<AddressManagementScreen> {
                 return Card(
                   margin: const EdgeInsets.only(bottom: 12),
                   child: ListTile(
-                    leading: Icon(address.isDefault ? Icons.home : Icons.location_on_outlined),
+                    leading: Icon(address.isDefault
+                        ? Icons.home
+                        : Icons.location_on_outlined),
                     title: Row(
                       children: [
                         Text(address.label),
                         if (address.isDefault) ...[
                           const SizedBox(width: 8),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2),
                             decoration: BoxDecoration(
                               color: theme.colorScheme.primary,
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: Text('Default', style: theme.textTheme.bodySmall?.copyWith(color: Colors.white)),
+                            child: Text('Default',
+                                style: theme.textTheme.bodySmall
+                                    ?.copyWith(color: Colors.white)),
                           ),
                         ],
                       ],
                     ),
-                    subtitle: Text(address.fullAddress, maxLines: 2, overflow: TextOverflow.ellipsis),
+                    subtitle: Text(address.fullAddress,
+                        maxLines: 2, overflow: TextOverflow.ellipsis),
                     trailing: PopupMenuButton(
                       itemBuilder: (context) => [
                         const PopupMenuItem(value: 'edit', child: Text('Edit')),
-                        const PopupMenuItem(value: 'delete', child: Text('Delete')),
+                        const PopupMenuItem(
+                            value: 'delete', child: Text('Delete')),
                       ],
                       onSelected: (value) {
                         if (value == 'edit') {
@@ -142,8 +161,14 @@ class _AddressManagementScreenState extends State<AddressManagementScreen> {
 class AddressForm extends StatefulWidget {
   final Address? address;
   final Function(Address) onSave;
+  final bool autoDetectOnOpen;
 
-  const AddressForm({super.key, this.address, required this.onSave});
+  const AddressForm({
+    super.key,
+    this.address,
+    required this.onSave,
+    this.autoDetectOnOpen = false,
+  });
 
   @override
   State<AddressForm> createState() => _AddressFormState();
@@ -162,18 +187,36 @@ class _AddressFormState extends State<AddressForm> {
   double? _longitude;
   bool _isLocating = false;
   String? _locationMessage;
+  late String _initialSignature;
 
   @override
   void initState() {
     super.initState();
     _labelController = TextEditingController(text: widget.address?.label ?? '');
-    _streetController = TextEditingController(text: widget.address?.streetAddress ?? '');
-    _postalCodeController = TextEditingController(text: widget.address?.postalCode ?? '');
-    _selectedCity = widget.address?.city ?? ComplianceHelper.getSupportedCities().first;
-    _selectedProvince = widget.address?.province ?? ComplianceHelper.getSupportedProvinces().first;
+    _streetController =
+        TextEditingController(text: widget.address?.streetAddress ?? '');
+    _postalCodeController =
+        TextEditingController(text: widget.address?.postalCode ?? '');
+    _selectedCity =
+        widget.address?.city ?? ComplianceHelper.getSupportedCities().first;
+    _selectedProvince = widget.address?.province ??
+        ComplianceHelper.getSupportedProvinces().first;
     _isDefault = widget.address?.isDefault ?? false;
     _latitude = widget.address?.latitude;
     _longitude = widget.address?.longitude;
+    _initialSignature = _buildSignature();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (!widget.autoDetectOnOpen) return;
+      final shouldAutoDetect = widget.address == null &&
+          _streetController.text.trim().isEmpty &&
+          _latitude == null &&
+          _longitude == null;
+      if (shouldAutoDetect) {
+        _useCurrentLocation();
+      }
+    });
   }
 
   @override
@@ -182,6 +225,53 @@ class _AddressFormState extends State<AddressForm> {
     _streetController.dispose();
     _postalCodeController.dispose();
     super.dispose();
+  }
+
+  String _buildSignature() {
+    return [
+      _streetController.text.trim().toLowerCase(),
+      _selectedCity.trim().toLowerCase(),
+      _selectedProvince.trim().toLowerCase(),
+      _postalCodeController.text.trim().toLowerCase(),
+    ].join('|');
+  }
+
+  Future<void> _geocodeAddress() async {
+    final queryParts = [
+      _streetController.text.trim(),
+      _selectedCity.trim(),
+      _selectedProvince.trim(),
+      _postalCodeController.text.trim(),
+      'South Africa',
+    ].where((p) => p.isNotEmpty).toList();
+    if (queryParts.isEmpty) return;
+
+    setState(() {
+      _isLocating = true;
+      _locationMessage = null;
+    });
+
+    try {
+      final query = queryParts.join(', ');
+      final locations = await locationFromAddress(query);
+      if (!mounted) return;
+      if (locations.isEmpty) return;
+
+      final loc = locations.first;
+      setState(() {
+        _latitude = loc.latitude;
+        _longitude = loc.longitude;
+        _locationMessage = 'Location updated from address';
+      });
+    } catch (e) {
+      debugPrint('Failed to geocode address: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLocating = false;
+        });
+      }
+    }
   }
 
   Future<void> _useCurrentLocation() async {
@@ -196,7 +286,9 @@ class _AddressFormState extends State<AddressForm> {
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         messenger.showSnackBar(
-          const SnackBar(content: Text('Location services are disabled. Please enable them in settings.')),
+          const SnackBar(
+              content: Text(
+                  'Location services are disabled. Please enable them in settings.')),
         );
         return;
       }
@@ -215,7 +307,9 @@ class _AddressFormState extends State<AddressForm> {
 
       if (permission == LocationPermission.deniedForever) {
         messenger.showSnackBar(
-          const SnackBar(content: Text('Location permission permanently denied. Please enable it in settings.')),
+          const SnackBar(
+              content: Text(
+                  'Location permission permanently denied. Please enable it in settings.')),
         );
         return;
       }
@@ -244,7 +338,8 @@ class _AddressFormState extends State<AddressForm> {
           ].where((p) => p != null && p.trim().isNotEmpty).join(', ');
 
           final postalCode = placemark.postalCode ?? '';
-          final city = placemark.locality ?? placemark.subAdministrativeArea ?? '';
+          final city =
+              placemark.locality ?? placemark.subAdministrativeArea ?? '';
           final province = placemark.administrativeArea ?? '';
 
           if (street.isNotEmpty) {
@@ -274,22 +369,24 @@ class _AddressFormState extends State<AddressForm> {
 
           _locationMessage = 'Address suggested from your location';
         } else {
-          _locationMessage = 'Location picked: ${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}';
+          _locationMessage =
+              'Location picked: ${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}';
         }
       });
     } catch (e) {
-      messenger.showSnackBar(
-        SnackBar(content: Text('Failed to get location: $e')),
-      );
+      if (mounted) {
+        SnackBarHelper.showError(context, 'Failed to get location: $e');
+      }
     } finally {
-      if (!mounted) return;
-      setState(() {
-        _isLocating = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLocating = false;
+        });
+      }
     }
   }
 
-  void _save() {
+  Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
 
     final currentUser = _authService.currentUser;
@@ -299,6 +396,12 @@ class _AddressFormState extends State<AddressForm> {
         const SnackBar(content: Text('Please log in to add an address')),
       );
       return;
+    }
+
+    final currentSignature = _buildSignature();
+    final shouldGeocode = currentSignature != _initialSignature;
+    if (shouldGeocode) {
+      await _geocodeAddress();
     }
 
     final address = Address(
@@ -314,7 +417,8 @@ class _AddressFormState extends State<AddressForm> {
       isDefault: _isDefault,
     );
 
-    debugPrint('📍 Saving address: ${address.label} for user ${currentUser.id}');
+    debugPrint(
+        '📍 Saving address: ${address.label} for user ${currentUser.id}');
     widget.onSave(address);
   }
 
@@ -323,7 +427,8 @@ class _AddressFormState extends State<AddressForm> {
     final theme = Theme.of(context);
 
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding:
+          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Form(
@@ -332,39 +437,55 @@ class _AddressFormState extends State<AddressForm> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(widget.address == null ? 'Add Address' : 'Edit Address', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
+              Text(widget.address == null ? 'Add Address' : 'Edit Address',
+                  style: theme.textTheme.titleLarge
+                      ?.copyWith(fontWeight: FontWeight.bold)),
               const SizedBox(height: 24),
               TextFormField(
                 controller: _labelController,
-                decoration: const InputDecoration(labelText: 'Label (e.g., Home, Work)'),
-                validator: (value) => value == null || value.trim().isEmpty ? 'Please enter a label' : null,
+                decoration: const InputDecoration(
+                    labelText: 'Label (e.g., Home, Work)'),
+                validator: (value) => value == null || value.trim().isEmpty
+                    ? 'Please enter a label'
+                    : null,
               ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _streetController,
                 decoration: const InputDecoration(labelText: 'Street Address'),
-                validator: (value) => value == null || value.trim().isEmpty ? 'Please enter street address' : null,
+                validator: (value) => value == null || value.trim().isEmpty
+                    ? 'Please enter street address'
+                    : null,
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
                 initialValue: _selectedCity,
                 decoration: const InputDecoration(labelText: 'City'),
-                items: ComplianceHelper.getSupportedCities().map((city) => DropdownMenuItem(value: city, child: Text(city))).toList(),
+                items: ComplianceHelper.getSupportedCities()
+                    .map((city) =>
+                        DropdownMenuItem(value: city, child: Text(city)))
+                    .toList(),
                 onChanged: (value) => setState(() => _selectedCity = value!),
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
                 initialValue: _selectedProvince,
                 decoration: const InputDecoration(labelText: 'Province'),
-                items: ComplianceHelper.getSupportedProvinces().map((province) => DropdownMenuItem(value: province, child: Text(province))).toList(),
-                onChanged: (value) => setState(() => _selectedProvince = value!),
+                items: ComplianceHelper.getSupportedProvinces()
+                    .map((province) => DropdownMenuItem(
+                        value: province, child: Text(province)))
+                    .toList(),
+                onChanged: (value) =>
+                    setState(() => _selectedProvince = value!),
               ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _postalCodeController,
                 decoration: const InputDecoration(labelText: 'Postal Code'),
                 keyboardType: TextInputType.number,
-                validator: (value) => value == null || value.trim().isEmpty ? 'Please enter postal code' : null,
+                validator: (value) => value == null || value.trim().isEmpty
+                    ? 'Please enter postal code'
+                    : null,
               ),
               const SizedBox(height: 16),
               Row(
@@ -379,7 +500,9 @@ class _AddressFormState extends State<AddressForm> {
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           : const Icon(Icons.my_location),
-                      label: Text(_isLocating ? 'Detecting location...' : 'Use current location'),
+                      label: Text(_isLocating
+                          ? 'Detecting location...'
+                          : 'Use current location'),
                     ),
                   ),
                 ],
@@ -405,7 +528,8 @@ class _AddressFormState extends State<AddressForm> {
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: _save,
-                  child: Text(widget.address == null ? 'Add Address' : 'Save Changes'),
+                  child: Text(
+                      widget.address == null ? 'Add Address' : 'Save Changes'),
                 ),
               ),
             ],

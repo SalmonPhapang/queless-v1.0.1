@@ -7,10 +7,17 @@ import 'package:queless/services/order_service.dart';
 import 'package:queless/screens/product/product_detail_screen.dart';
 import 'package:queless/screens/browse/category_screen.dart';
 import 'package:queless/screens/browse/browse_screen.dart';
+import 'package:queless/screens/food/store_detail_screen.dart';
+import 'package:queless/screens/orders/orders_screen.dart';
 import 'package:queless/screens/orders/order_tracking_screen.dart';
 import 'package:queless/utils/formatters.dart';
 import 'package:queless/utils/compliance_helper.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:queless/models/promotion.dart';
+import 'package:queless/services/promotion_service.dart';
+import 'package:queless/services/store_service.dart';
+import 'package:queless/widgets/promotion_modal.dart';
+import 'package:queless/widgets/promo_badge.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -23,6 +30,8 @@ class _HomeScreenState extends State<HomeScreen> {
   final _productService = ProductService();
   final _authService = AuthService();
   final _orderService = OrderService();
+  final _promotionService = PromotionService();
+  final _storeService = StoreService();
   List<Product> _featuredProducts = [];
   List<Product> _localBrands = [];
   List<Order> _activeOrders = [];
@@ -40,15 +49,303 @@ class _HomeScreenState extends State<HomeScreen> {
       final featured = await _productService.getFeaturedProducts();
       final local = await _productService.getLocalBrandProducts();
       final active = await _orderService.getActiveOrders();
+      await _promotionService.refreshActivePromotions();
       setState(() {
         _featuredProducts = featured;
         _localBrands = local.take(4).toList();
         _activeOrders = active;
         _isLoading = false;
       });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _maybeShowPromotion();
+      });
     } catch (e) {
       setState(() => _isLoading = false);
     }
+  }
+
+  Future<void> _maybeShowPromotion() async {
+    final promo = _promotionService.featuredPromotion;
+    if (promo == null) return;
+    if (!await _promotionService.shouldShowPromotionModal()) return;
+    if (!context.mounted) return;
+
+    final rootContext = context;
+    await showDialog<void>(
+      context: rootContext,
+      builder: (dialogContext) => PromotionModal(
+        promotion: promo,
+        onDismiss: () => Navigator.pop(dialogContext),
+        onView: () async {
+          Navigator.pop(dialogContext);
+          if (!rootContext.mounted) return;
+
+          if (promo.targetType == PromotionTargetType.product) {
+            final product =
+                await _productService.getProductById(promo.targetId);
+            if (!rootContext.mounted || product == null) return;
+            await Navigator.push(
+              rootContext,
+              MaterialPageRoute(
+                builder: (_) => ProductDetailScreen(product: product),
+              ),
+            );
+            if (!rootContext.mounted) return;
+            await _loadProducts();
+            return;
+          }
+
+          final store = await _storeService.getStoreById(promo.targetId);
+          if (!rootContext.mounted || store == null) return;
+          await Navigator.push(
+            rootContext,
+            MaterialPageRoute(builder: (_) => StoreDetailScreen(store: store)),
+          );
+        },
+      ),
+    );
+
+    await _promotionService.markPromotionModalShown();
+  }
+
+  Widget _buildBadge(ThemeData theme, String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        text,
+        style: theme.textTheme.labelSmall?.copyWith(
+          color: Colors.white,
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActiveOrderCard(ThemeData theme, Order order) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.secondary,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.18),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(
+              Icons.local_shipping,
+              color: Colors.white,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Active Order',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    _buildBadge(theme, order.status.displayName, Colors.black),
+                    _buildBadge(theme, order.orderType,
+                        Colors.white.withValues(alpha: 0.2)),
+                    Text(
+                      Formatters.formatCurrency(order.total),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          OutlinedButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => OrderTrackingScreen(
+                    orderId: order.id,
+                    source: OrderTrackingSource.home,
+                  ),
+                ),
+              );
+            },
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.white,
+              side: BorderSide(
+                color: Colors.white.withValues(alpha: 0.9),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              minimumSize: const Size(0, 32),
+              textStyle: theme.textTheme.labelMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            child: const Text('Track'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMultipleActiveOrders(ThemeData theme, List<Order> orders) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Active Orders (${orders.length})',
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            TextButton(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const OrdersScreen()),
+              ),
+              child: const Text('View All'),
+            ),
+          ],
+        ),
+        SizedBox(
+          height: 100,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: orders.length,
+            itemBuilder: (context, index) {
+              final order = orders[index];
+              return Container(
+                width: MediaQuery.of(context).size.width * 0.8,
+                margin: const EdgeInsets.only(right: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.secondary,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.18),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.local_shipping,
+                        color: Colors.white,
+                        size: 18,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            order.orderNumber.isNotEmpty
+                                ? order.orderNumber
+                                : 'Order #${order.id.substring(0, 6)}',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                              fontSize: 13,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 4),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 4,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              _buildBadge(theme, order.status.displayName,
+                                  Colors.black),
+                              _buildBadge(theme, order.orderType,
+                                  Colors.white.withValues(alpha: 0.2)),
+                              Text(
+                                Formatters.formatCurrency(order.total),
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: Colors.white,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    OutlinedButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => OrderTrackingScreen(
+                              orderId: order.id,
+                              source: OrderTrackingSource.home,
+                            ),
+                          ),
+                        );
+                      },
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        side: BorderSide(
+                          color: Colors.white.withValues(alpha: 0.9),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
+                        minimumSize: const Size(0, 30),
+                        textStyle: theme.textTheme.labelSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      child: const Text('Track'),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
   }
 
   @override
@@ -61,10 +358,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Queless'),
-        actions: [
-          IconButton(
-              icon: const Icon(Icons.notifications_outlined), onPressed: () {}),
-        ],
+        actions: const [],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -87,109 +381,12 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     if (hasActiveOrder) ...[
-                      const SizedBox(height: 12),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.secondary,
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Container(
-                              width: 34,
-                              height: 34,
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.18),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: const Icon(
-                                Icons.local_shipping,
-                                color: Colors.white,
-                                size: 20,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Active Order',
-                                    style: theme.textTheme.titleSmall?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                  if (latestOrder != null)
-                                    Wrap(
-                                      spacing: 8,
-                                      runSpacing: 4,
-                                      children: [
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 8, vertical: 4),
-                                          decoration: BoxDecoration(
-                                            color: Colors.black,
-                                            borderRadius:
-                                                BorderRadius.circular(999),
-                                          ),
-                                          child: Text(
-                                            latestOrder.status.displayName,
-                                            style: theme.textTheme.bodySmall
-                                                ?.copyWith(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                        ),
-                                        Text(
-                                          Formatters.formatCurrency(
-                                              latestOrder.total),
-                                          style: theme.textTheme.bodyMedium
-                                              ?.copyWith(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            OutlinedButton.icon(
-                              onPressed: latestOrder == null
-                                  ? null
-                                  : () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (_) => OrderTrackingScreen(
-                                            orderId: latestOrder.id,
-                                            source: OrderTrackingSource.home,
-                                          ),
-                                        ),
-                                      );
-                                    },
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: Colors.white,
-                                side: BorderSide(
-                                  color: Colors.white.withValues(alpha: 0.9),
-                                ),
-                                disabledForegroundColor:
-                                    Colors.white.withValues(alpha: 0.5),
-                              ),
-                              icon: const Icon(Icons.location_on),
-                              label: const Text('Track'),
-                            ),
-                          ],
-                        ),
-                      ),
+                      if (_activeOrders.length == 1)
+                        _buildActiveOrderCard(theme, _activeOrders.first)
+                      else
+                        _buildMultipleActiveOrders(theme, _activeOrders),
+                      const SizedBox(height: 24),
                     ],
-                    const SizedBox(height: 24),
                     ResponsibleDrinkingBanner(),
                     const SizedBox(height: 24),
                     Text('Categories',
@@ -405,6 +602,7 @@ class _ProductCardState extends State<ProductCard> {
     final theme = Theme.of(context);
     final textColor =
         _isHovering ? theme.colorScheme.secondary : theme.colorScheme.onSurface;
+    final promoService = PromotionService();
 
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovering = true),
@@ -425,7 +623,7 @@ class _ProductCardState extends State<ProductCard> {
           width: 160,
           margin: const EdgeInsets.only(right: 16),
           child: Card(
-            color: Colors.white,
+            color: theme.colorScheme.surface,
             elevation: 2,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
@@ -439,63 +637,87 @@ class _ProductCardState extends State<ProductCard> {
               children: [
                 // Top visual area scales to available height to avoid overflow
                 Expanded(
-                  child: widget.product.imageUrl.isNotEmpty
-                      ? CachedNetworkImage(
-                          imageUrl: widget.product.imageUrl,
-                          imageBuilder: (context, imageProvider) => Container(
-                            padding: const EdgeInsets.only(top: 16),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: const BorderRadius.vertical(
-                                  top: Radius.circular(12)),
-                            ),
-                            child: Image(
-                              image: imageProvider,
-                              fit: BoxFit.contain,
-                              width: double.infinity,
-                            ),
-                          ),
-                          placeholder: (context, url) => Container(
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.surfaceContainerHighest,
-                              borderRadius: const BorderRadius.vertical(
-                                  top: Radius.circular(12)),
-                            ),
-                            child: Center(
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: theme.colorScheme.primary
-                                    .withValues(alpha: 0.3),
+                  child: AnimatedBuilder(
+                    animation: promoService,
+                    builder: (context, _) {
+                      final promo =
+                          promoService.promotionForProduct(widget.product.id);
+
+                      final image = widget.product.imageUrl.isNotEmpty
+                          ? CachedNetworkImage(
+                              imageUrl: widget.product.imageUrl,
+                              imageBuilder: (context, imageProvider) =>
+                                  Container(
+                                padding: const EdgeInsets.only(top: 16),
+                                decoration: BoxDecoration(
+                                  color: theme.colorScheme.surface,
+                                  borderRadius: const BorderRadius.vertical(
+                                      top: Radius.circular(12)),
+                                ),
+                                child: Image(
+                                  image: imageProvider,
+                                  fit: BoxFit.contain,
+                                  width: double.infinity,
+                                ),
                               ),
+                              placeholder: (context, url) => Container(
+                                decoration: BoxDecoration(
+                                  color:
+                                      theme.colorScheme.surfaceContainerHighest,
+                                  borderRadius: const BorderRadius.vertical(
+                                      top: Radius.circular(12)),
+                                ),
+                                child: Center(
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: theme.colorScheme.primary
+                                        .withValues(alpha: 0.3),
+                                  ),
+                                ),
+                              ),
+                              errorWidget: (context, url, error) => Container(
+                                decoration: BoxDecoration(
+                                  color:
+                                      theme.colorScheme.surfaceContainerHighest,
+                                  borderRadius: const BorderRadius.vertical(
+                                      top: Radius.circular(12)),
+                                ),
+                                child: Center(
+                                  child: Icon(Icons.local_bar,
+                                      size: 48,
+                                      color: theme.colorScheme.onSurface
+                                          .withValues(alpha: 0.3)),
+                                ),
+                              ),
+                            )
+                          : Container(
+                              decoration: BoxDecoration(
+                                color:
+                                    theme.colorScheme.surfaceContainerHighest,
+                                borderRadius: const BorderRadius.vertical(
+                                    top: Radius.circular(12)),
+                              ),
+                              child: Center(
+                                child: Icon(Icons.local_bar,
+                                    size: 48,
+                                    color: theme.colorScheme.onSurface
+                                        .withValues(alpha: 0.3)),
+                              ),
+                            );
+
+                      return Stack(
+                        children: [
+                          Positioned.fill(child: image),
+                          if (promo != null)
+                            Positioned(
+                              top: 12,
+                              left: 12,
+                              child: PromoBadge(text: promo.badgeText),
                             ),
-                          ),
-                          errorWidget: (context, url, error) => Container(
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.surfaceContainerHighest,
-                              borderRadius: const BorderRadius.vertical(
-                                  top: Radius.circular(12)),
-                            ),
-                            child: Center(
-                              child: Icon(Icons.local_bar,
-                                  size: 48,
-                                  color: theme.colorScheme.onSurface
-                                      .withValues(alpha: 0.3)),
-                            ),
-                          ),
-                        )
-                      : Container(
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.surfaceContainerHighest,
-                            borderRadius: const BorderRadius.vertical(
-                                top: Radius.circular(12)),
-                          ),
-                          child: Center(
-                            child: Icon(Icons.local_bar,
-                                size: 48,
-                                color: theme.colorScheme.onSurface
-                                    .withValues(alpha: 0.3)),
-                          ),
-                        ),
+                        ],
+                      );
+                    },
+                  ),
                 ),
                 Padding(
                   padding: const EdgeInsets.all(12),

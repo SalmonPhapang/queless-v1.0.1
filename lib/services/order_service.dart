@@ -5,6 +5,7 @@ import 'package:queless/services/auth_service.dart';
 import 'package:queless/services/cart_service.dart';
 import 'package:queless/services/food_cart_service.dart';
 import 'package:queless/supabase/supabase_config.dart';
+import 'package:queless/utils/id_generator.dart';
 
 class OrderService {
   static final OrderService _instance = OrderService._internal();
@@ -46,9 +47,11 @@ class OrderService {
     final deliveryFee = _cartService.deliveryFee;
     final discount = _cartService.calculateDiscount();
     final total = _cartService.calculateTotal();
+    final orderNumber = IdGenerator.generateOrderNumber();
 
     final orderData = {
       'user_id': user.id,
+      'order_number': orderNumber,
       'items': orderItems.map((i) => i.toJson()).toList(),
       'subtotal': subtotal,
       'delivery_fee': deliveryFee,
@@ -113,9 +116,11 @@ class OrderService {
     final discount = _foodCartService.calculateDiscount();
     final total = _foodCartService.calculateTotal();
     final storeId = _foodCartService.currentStoreId;
+    final orderNumber = IdGenerator.generateOrderNumber();
 
     final orderData = {
       'user_id': user.id,
+      'order_number': orderNumber,
       'items': orderItems.map((i) => i.toJson()).toList(),
       'subtotal': subtotal,
       'delivery_fee': deliveryFee,
@@ -161,18 +166,27 @@ class OrderService {
         ascending: false,
       );
 
-      final orders = data.map((json) => Order.fromJson(json)).toList();
-
-      await _autoCancelStalePendingOrders(orders);
-
-      return orders
-          .map((order) => _isPendingOlderThan24Hours(order)
-              ? order.copyWith(status: OrderStatus.cancelled)
-              : order)
+      final orders = data
+          .map((json) {
+            try {
+              return Order.fromJson(json);
+            } catch (e) {
+              debugPrint('Skipping malformed order: $e');
+              return null;
+            }
+          })
+          .whereType<Order>()
           .toList();
+
+      // Run stale order cancellation in background
+      _autoCancelStalePendingOrders(orders).catchError((e) {
+        debugPrint('Error in auto-cancel background task: $e');
+      });
+
+      return orders;
     } catch (e) {
       debugPrint('Error getting user orders: $e');
-      return [];
+      rethrow;
     }
   }
 

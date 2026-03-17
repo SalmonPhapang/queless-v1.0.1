@@ -6,6 +6,7 @@ import 'package:queless/screens/main_screen.dart';
 import 'package:queless/screens/payments/paystack_payment_screen.dart';
 import 'package:queless/services/order_service.dart';
 import 'package:queless/services/payment_service.dart';
+import 'package:queless/utils/snack_bar_helper.dart';
 import 'package:queless/services/store_service.dart';
 import 'package:queless/utils/formatters.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -95,11 +96,9 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
     final method = _mapPaymentMethod(_order!.paymentMethod);
     if (method == null) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Unsupported payment method for this order.'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-        ),
+      SnackBarHelper.showError(
+        context,
+        'Unsupported payment method for this order.',
       );
       return;
     }
@@ -216,7 +215,11 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => _handleBack(context),
         ),
-        title: Text('Order #${_order!.id.substring(0, 8)}'),
+        title: Text(
+          _order!.orderNumber.isNotEmpty
+              ? _order!.orderNumber
+              : 'Order #${_order!.id.substring(0, 8)}',
+        ),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -255,6 +258,7 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
               )
             else
               Container(
+                width: double.infinity,
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   color:

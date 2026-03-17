@@ -53,6 +53,7 @@ export type Database = {
           delivery_fee: number
           discount: number
           id: string
+          order_number: string
           items: Json
           payment_method: string
           payment_status: string
@@ -63,6 +64,11 @@ export type Database = {
           tracking_updates: Json
           updated_at: string
           user_id: string
+          store_id: string | null
+          driver_name: string | null
+          driver_phone: string | null
+          driver_location: Json | null
+          estimated_delivery_time: string | null
         }
         Insert: {
           created_at?: string
@@ -70,6 +76,7 @@ export type Database = {
           delivery_fee?: number
           discount?: number
           id?: string
+          order_number?: string
           items?: Json
           payment_method?: string
           payment_status?: string
@@ -80,6 +87,11 @@ export type Database = {
           tracking_updates?: Json
           updated_at?: string
           user_id: string
+          store_id?: string | null
+          driver_name?: string | null
+          driver_phone?: string | null
+          driver_location?: Json | null
+          estimated_delivery_time?: string | null
         }
         Update: {
           created_at?: string
@@ -87,6 +99,7 @@ export type Database = {
           delivery_fee?: number
           discount?: number
           id?: string
+          order_number?: string
           items?: Json
           payment_method?: string
           payment_status?: string
@@ -97,6 +110,11 @@ export type Database = {
           tracking_updates?: Json
           updated_at?: string
           user_id?: string
+          store_id?: string | null
+          driver_name?: string | null
+          driver_phone?: string | null
+          driver_location?: Json | null
+          estimated_delivery_time?: string | null
         }
         Relationships: [
           {
@@ -232,6 +250,54 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      promotions: {
+        Row: {
+          id: string
+          title: string
+          message: string
+          target_type: string
+          target_id: string
+          badge_text: string
+          image_url: string
+          is_active: boolean
+          priority: number
+          starts_at: string | null
+          ends_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          title?: string
+          message?: string
+          target_type?: string
+          target_id: string
+          badge_text?: string
+          image_url?: string
+          is_active?: boolean
+          priority?: number
+          starts_at?: string | null
+          ends_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          title?: string
+          message?: string
+          target_type?: string
+          target_id?: string
+          badge_text?: string
+          image_url?: string
+          is_active?: boolean
+          priority?: number
+          starts_at?: string | null
+          ends_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       stores: {
         Row: {

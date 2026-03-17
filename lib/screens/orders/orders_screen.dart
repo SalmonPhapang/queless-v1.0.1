@@ -3,6 +3,7 @@ import 'package:queless/models/order.dart';
 import 'package:queless/models/product.dart';
 import 'package:queless/services/order_service.dart';
 import 'package:queless/services/product_service.dart';
+import 'package:queless/utils/snack_bar_helper.dart';
 import 'package:queless/screens/orders/order_tracking_screen.dart';
 import 'package:queless/utils/formatters.dart';
 
@@ -13,7 +14,8 @@ class OrdersScreen extends StatefulWidget {
   State<OrdersScreen> createState() => _OrdersScreenState();
 }
 
-class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderStateMixin {
+class _OrdersScreenState extends State<OrdersScreen>
+    with SingleTickerProviderStateMixin {
   final _orderService = OrderService();
   final _productService = ProductService();
   late TabController _tabController;
@@ -36,40 +38,55 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
   }
 
   Future<void> _loadOrders() async {
+    if (!mounted) return;
     setState(() => _isLoading = true);
     try {
       final active = await _orderService.getActiveOrders();
       final history = await _orderService.getOrderHistory();
       final typeLabels = <String, String>{};
 
+      if (mounted) {
+        setState(() {
+          _activeOrders = active;
+          _orderHistory = history;
+        });
+      }
+
       final allOrders = [...active, ...history];
       for (final order in allOrders) {
         if (order.items.isEmpty) continue;
         final firstItem = order.items.first;
         try {
-          final product = await _productService.getProductById(firstItem.productId);
+          final product =
+              await _productService.getProductById(firstItem.productId);
           if (product != null) {
-            final label = product.productType == ProductType.food ? 'Food' : 'Alcohol';
+            final label =
+                product.productType == ProductType.food ? 'Food' : 'Alcohol';
             typeLabels[order.id] = label;
           }
-        } catch (_) {}
+        } catch (e) {
+          debugPrint('Error fetching product label for order ${order.id}: $e');
+        }
       }
 
-      setState(() {
-        _activeOrders = active;
-        _orderHistory = history;
-        _orderTypeLabels = typeLabels;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _orderTypeLabels = typeLabels;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      setState(() => _isLoading = false);
+      debugPrint('Error loading orders: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+        SnackBarHelper.showError(
+            context, 'Failed to load orders. Please try again.');
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('My Orders'),
@@ -101,7 +118,9 @@ class _OrdersScreenState extends State<OrdersScreen> with SingleTickerProviderSt
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.receipt_long_outlined, size: 80, color: theme.colorScheme.onSurface.withValues(alpha: 0.3)),
+            Icon(Icons.receipt_long_outlined,
+                size: 80,
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.3)),
             const SizedBox(height: 16),
             Text(emptyMessage, style: theme.textTheme.titleMedium),
           ],
@@ -128,7 +147,8 @@ class OrderCard extends StatelessWidget {
   final Order order;
   final String orderTypeLabel;
 
-  const OrderCard({super.key, required this.order, required this.orderTypeLabel});
+  const OrderCard(
+      {super.key, required this.order, required this.orderTypeLabel});
 
   Color _getStatusColor(OrderStatus status, BuildContext context) {
     final theme = Theme.of(context);
@@ -179,11 +199,19 @@ class OrderCard extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Order #${order.id.substring(0, 8)}', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                  Text(
+                    order.orderNumber.isNotEmpty
+                        ? order.orderNumber
+                        : 'Order #${order.id.substring(0, 8)}',
+                    style: theme.textTheme.titleMedium
+                        ?.copyWith(fontWeight: FontWeight.bold),
+                  ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: _getStatusColor(order.status, context).withValues(alpha: 0.2),
+                      color: _getStatusColor(order.status, context)
+                          .withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
@@ -200,16 +228,20 @@ class OrderCard extends StatelessWidget {
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: _getOrderTypeColor(context).withValues(alpha: 0.12),
+                      color:
+                          _getOrderTypeColor(context).withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(999),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
-                          orderTypeLabel.toLowerCase() == 'food' ? Icons.restaurant : Icons.local_bar,
+                          orderTypeLabel.toLowerCase() == 'food'
+                              ? Icons.restaurant
+                              : Icons.local_bar,
                           size: 14,
                           color: _getOrderTypeColor(context),
                         ),
@@ -229,20 +261,31 @@ class OrderCard extends StatelessWidget {
               const SizedBox(height: 12),
               Row(
                 children: [
-                  Icon(Icons.calendar_today, size: 14, color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
+                  Icon(Icons.calendar_today,
+                      size: 14,
+                      color:
+                          theme.colorScheme.onSurface.withValues(alpha: 0.6)),
                   const SizedBox(width: 6),
-                  Text(Formatters.formatDateTime(order.createdAt), style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurface.withValues(alpha: 0.6))),
+                  Text(Formatters.formatDateTime(order.createdAt),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurface
+                              .withValues(alpha: 0.6))),
                 ],
               ),
               const SizedBox(height: 8),
               Row(
                 children: [
-                  Icon(Icons.location_on_outlined, size: 14, color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
+                  Icon(Icons.location_on_outlined,
+                      size: 14,
+                      color:
+                          theme.colorScheme.onSurface.withValues(alpha: 0.6)),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
                       order.deliveryAddress.streetAddress,
-                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurface
+                              .withValues(alpha: 0.6)),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -253,8 +296,12 @@ class OrderCard extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('${order.totalItems} items', style: theme.textTheme.bodyMedium),
-                  Text(Formatters.formatCurrency(order.total), style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.primary, fontWeight: FontWeight.bold)),
+                  Text('${order.totalItems} items',
+                      style: theme.textTheme.bodyMedium),
+                  Text(Formatters.formatCurrency(order.total),
+                      style: theme.textTheme.titleMedium?.copyWith(
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.bold)),
                 ],
               ),
             ],

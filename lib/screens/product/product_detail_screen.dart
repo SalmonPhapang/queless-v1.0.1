@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:queless/models/product.dart';
 import 'package:queless/services/cart_service.dart';
 import 'package:queless/services/auth_service.dart';
+import 'package:queless/services/promotion_service.dart';
 import 'package:queless/utils/formatters.dart';
+import 'package:queless/widgets/promo_badge.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 class ProductDetailScreen extends StatefulWidget {
@@ -77,51 +79,75 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  widget.product.imageUrl.isNotEmpty
-                      ? CachedNetworkImage(
-                          imageUrl: widget.product.imageUrl,
-                          imageBuilder: (context, imageProvider) => Container(
-                            height: 300,
-                            decoration: BoxDecoration(
+                  AnimatedBuilder(
+                    animation: PromotionService(),
+                    builder: (context, _) {
+                      final promo = PromotionService()
+                          .promotionForProduct(widget.product.id);
+
+                      final image = widget.product.imageUrl.isNotEmpty
+                          ? CachedNetworkImage(
+                              imageUrl: widget.product.imageUrl,
+                              imageBuilder: (context, imageProvider) =>
+                                  Container(
+                                height: 300,
+                                decoration: BoxDecoration(
+                                  color:
+                                      theme.colorScheme.surfaceContainerHighest,
+                                  image: DecorationImage(
+                                    image: imageProvider,
+                                    fit: BoxFit.contain,
+                                  ),
+                                ),
+                              ),
+                              placeholder: (context, url) => Container(
+                                height: 300,
+                                color:
+                                    theme.colorScheme.surfaceContainerHighest,
+                                child: Center(
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: theme.colorScheme.primary
+                                        .withValues(alpha: 0.3),
+                                  ),
+                                ),
+                              ),
+                              errorWidget: (context, url, error) => Container(
+                                height: 300,
+                                color:
+                                    theme.colorScheme.surfaceContainerHighest,
+                                child: Center(
+                                  child: Icon(Icons.local_bar,
+                                      size: 100,
+                                      color: theme.colorScheme.onSurface
+                                          .withValues(alpha: 0.3)),
+                                ),
+                              ),
+                            )
+                          : Container(
+                              height: 300,
                               color: theme.colorScheme.surfaceContainerHighest,
-                              image: DecorationImage(
-                                image: imageProvider,
-                                fit: BoxFit.contain,
+                              child: Center(
+                                child: Icon(Icons.local_bar,
+                                    size: 100,
+                                    color: theme.colorScheme.onSurface
+                                        .withValues(alpha: 0.3)),
                               ),
+                            );
+
+                      return Stack(
+                        children: [
+                          image,
+                          if (promo != null)
+                            Positioned(
+                              top: 20,
+                              left: 20,
+                              child: PromoBadge(text: promo.badgeText),
                             ),
-                          ),
-                          placeholder: (context, url) => Container(
-                            height: 300,
-                            color: theme.colorScheme.surfaceContainerHighest,
-                            child: Center(
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: theme.colorScheme.primary
-                                    .withValues(alpha: 0.3),
-                              ),
-                            ),
-                          ),
-                          errorWidget: (context, url, error) => Container(
-                            height: 300,
-                            color: theme.colorScheme.surfaceContainerHighest,
-                            child: Center(
-                              child: Icon(Icons.local_bar,
-                                  size: 120,
-                                  color: theme.colorScheme.primary
-                                      .withValues(alpha: 0.5)),
-                            ),
-                          ),
-                        )
-                      : Container(
-                          height: 300,
-                          color: theme.colorScheme.surfaceContainerHighest,
-                          child: Center(
-                            child: Icon(Icons.local_bar,
-                                size: 120,
-                                color: theme.colorScheme.primary
-                                    .withValues(alpha: 0.5)),
-                          ),
-                        ),
+                        ],
+                      );
+                    },
+                  ),
                   Padding(
                     padding: const EdgeInsets.all(20),
                     child: Column(
@@ -254,8 +280,17 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         : const Icon(Icons.shopping_cart_outlined),
                     label: _isAdding
                         ? const SizedBox.shrink()
-                        : Text(
-                            'Add • ${Formatters.formatCurrency(widget.product.price * _quantity)}'),
+                        : FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              'Add • ${Formatters.formatCurrency(widget.product.price * _quantity)}',
+                              maxLines: 1,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
                   ),
                 ),
               ],

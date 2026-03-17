@@ -135,6 +135,9 @@ class SupabaseAuthManager extends AuthManager with EmailSignInManager {
       final user = SupabaseConfig.auth.currentUser;
       if (user == null) return;
 
+      // Delete user profile from public.users
+      // Note: Full deletion of auth.users requires a service role trigger or edge function
+      // on the backend, as users cannot delete themselves from auth.users via the client SDK.
       await SupabaseService.delete('users', filters: {'id': user.id});
       _currentUser = null;
     } catch (e) {
