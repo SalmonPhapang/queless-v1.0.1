@@ -97,11 +97,10 @@ ThemeData get lightTheme => ThemeData(
       cardColor: LightModeColors.lightCardBackground,
       dividerColor: LightModeColors.lightDivider,
       appBarTheme: AppBarTheme(
-        backgroundColor: LightModeColors.lightAppBarBackground,
-        foregroundColor: LightModeColors.lightOnSurface,
-        elevation: 0,
-        centerTitle: true,
-      ),
+          backgroundColor: LightModeColors.lightAppBarBackground,
+          foregroundColor: LightModeColors.lightOnSurface,
+          elevation: 0,
+          centerTitle: true),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         backgroundColor: LightModeColors.lightPrimary,
