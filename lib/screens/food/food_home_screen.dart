@@ -96,7 +96,7 @@ class _FoodHomeScreenState extends State<FoodHomeScreen> {
         final stores = await _storeService.getNearbyStores(
           latitude: position.latitude,
           longitude: position.longitude,
-          radiusMeters: 50000, // Increased to 50km for testing
+          radiusMeters: 5000, // 5km radius
           category: 'restaurant',
         );
 

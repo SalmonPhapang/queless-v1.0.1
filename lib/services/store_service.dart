@@ -122,22 +122,13 @@ class StoreService {
     required double latitude,
     required double longitude,
     String category = 'liquor',
+    double radiusMeters = 5000,
   }) async {
-    // 1. Try 3km radius
-    var stores = await getNearbyStores(
+    // Try to find a store within the specified radius
+    final stores = await getNearbyStores(
       latitude: latitude,
       longitude: longitude,
-      radiusMeters: 3000,
-      category: category,
-    );
-
-    if (stores.isNotEmpty) return stores.first;
-
-    // 2. Try 50km radius
-    stores = await getNearbyStores(
-      latitude: latitude,
-      longitude: longitude,
-      radiusMeters: 50000,
+      radiusMeters: radiusMeters,
       category: category,
     );
 

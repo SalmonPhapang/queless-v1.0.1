@@ -58,8 +58,13 @@ class _HomeScreenState extends State<HomeScreen> {
     final position = await _locationService.getCurrentLocation();
     if (position == null) return;
 
-    // Fetch all liquor stores for testing (removing km range)
-    final stores = await _storeService.getStoresByCategory('liquor');
+    // Fetch liquor stores within 5km
+    final stores = await _storeService.getNearbyStores(
+      latitude: position.latitude,
+      longitude: position.longitude,
+      radiusMeters: 5000,
+      category: 'liquor',
+    );
 
     final address = await _locationService.getAddressFromCoordinates(
         position.latitude, position.longitude);
