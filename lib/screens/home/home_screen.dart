@@ -5,7 +5,6 @@ import 'package:queless/services/product_service.dart';
 import 'package:queless/services/auth_service.dart';
 import 'package:queless/services/order_service.dart';
 import 'package:queless/screens/product/product_detail_screen.dart';
-import 'package:queless/screens/browse/category_screen.dart';
 import 'package:queless/screens/browse/browse_screen.dart';
 import 'package:queless/screens/food/store_detail_screen.dart';
 import 'package:queless/screens/orders/orders_screen.dart';
@@ -16,8 +15,12 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:queless/models/promotion.dart';
 import 'package:queless/services/promotion_service.dart';
 import 'package:queless/services/store_service.dart';
+import 'package:queless/services/location_service.dart';
+import 'package:queless/services/cart_service.dart';
+import 'package:queless/models/store.dart';
 import 'package:queless/widgets/promotion_modal.dart';
 import 'package:queless/widgets/promo_badge.dart';
+import 'package:queless/screens/home/store_card.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -32,36 +35,65 @@ class _HomeScreenState extends State<HomeScreen> {
   final _orderService = OrderService();
   final _promotionService = PromotionService();
   final _storeService = StoreService();
-  List<Product> _featuredProducts = [];
-  List<Product> _localBrands = [];
+  final _locationService = LocationService();
+  final _cartService = CartService();
   List<Order> _activeOrders = [];
   bool _isLoading = true;
+  List<Store> _nearbyStores = [];
+  String? _userAddress;
 
   @override
   void initState() {
     super.initState();
-    _loadProducts();
+    _initData();
   }
 
-  Future<void> _loadProducts() async {
+  Future<void> _initData() async {
+    setState(() => _isLoading = true);
+    await _fetchNearbyStoresAndAddress();
+    await _loadOrdersAndPromotions();
+  }
+
+  Future<void> _fetchNearbyStoresAndAddress() async {
+    final position = await _locationService.getCurrentLocation();
+    if (position == null) return;
+
+    // Fetch all liquor stores for testing (removing km range)
+    final stores = await _storeService.getStoresByCategory('liquor');
+
+    final address = await _locationService.getAddressFromCoordinates(
+        position.latitude, position.longitude);
+
+    if (mounted) {
+      setState(() {
+        _nearbyStores = stores;
+        _userAddress = address;
+      });
+    }
+  }
+
+  Future<void> _loadOrdersAndPromotions() async {
     setState(() => _isLoading = true);
     try {
-      final featured = await _productService.getFeaturedProducts();
-      final local = await _productService.getLocalBrandProducts();
       final active = await _orderService.getActiveOrders();
       await _promotionService.refreshActivePromotions();
-      setState(() {
-        _featuredProducts = featured;
-        _localBrands = local.take(4).toList();
-        _activeOrders = active;
-        _isLoading = false;
-      });
+
+      if (mounted) {
+        setState(() {
+          _activeOrders = active;
+          _isLoading = false;
+        });
+      }
+
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         _maybeShowPromotion();
       });
     } catch (e) {
-      setState(() => _isLoading = false);
+      debugPrint('❌ Error loading orders/promotions in HomeScreen: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -92,7 +124,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             );
             if (!rootContext.mounted) return;
-            await _loadProducts();
+            await _loadOrdersAndPromotions();
             return;
           }
 
@@ -363,7 +395,7 @@ class _HomeScreenState extends State<HomeScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
-              onRefresh: _loadProducts,
+              onRefresh: _initData,
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(20),
                 child: Column(
@@ -381,82 +413,138 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     if (hasActiveOrder) ...[
+                      const SizedBox(height: 24),
                       if (_activeOrders.length == 1)
                         _buildActiveOrderCard(theme, _activeOrders.first)
                       else
                         _buildMultipleActiveOrders(theme, _activeOrders),
-                      const SizedBox(height: 24),
                     ],
-                    ResponsibleDrinkingBanner(),
-                    const SizedBox(height: 24),
-                    Text('Categories',
-                        style: theme.textTheme.titleLarge
-                            ?.copyWith(fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 16),
-                    CategoryGrid(),
-                    const SizedBox(height: 32),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('Featured Products',
-                            style: theme.textTheme.titleLarge
-                                ?.copyWith(fontWeight: FontWeight.bold)),
-                        TextButton(
-                          onPressed: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (_) => const BrowseScreen())),
-                          child: const Text('See All'),
+                    if (_userAddress != null) ...[
+                      const SizedBox(height: 24),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color:
+                              theme.colorScheme.primary.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: theme.colorScheme.primary
+                                .withValues(alpha: 0.1),
+                          ),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      height: 240,
-                      child: ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: _featuredProducts.length,
-                        itemBuilder: (context, index) =>
-                            ProductCard(product: _featuredProducts[index]),
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
+                        child: Row(
                           children: [
-                            Icon(Icons.flag, color: Colors.green, size: 20),
-                            const SizedBox(width: 8),
-                            Text('Local Brands',
-                                style: theme.textTheme.titleLarge
-                                    ?.copyWith(fontWeight: FontWeight.bold)),
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.primary
+                                    .withValues(alpha: 0.1),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.location_on_rounded,
+                                color: theme.colorScheme.primary,
+                                size: 24,
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Your Location',
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: theme.colorScheme.primary,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    _userAddress!,
+                                    style:
+                                        theme.textTheme.titleMedium?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ],
                         ),
-                        TextButton(
-                          onPressed: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (_) => const BrowseScreen())),
-                          child: const Text('See All'),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    GridView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        childAspectRatio: 0.75,
-                        crossAxisSpacing: 16,
-                        mainAxisSpacing: 16,
                       ),
-                      itemCount: _localBrands.length,
-                      itemBuilder: (context, index) =>
-                          ProductCard(product: _localBrands[index]),
-                    ),
+                    ],
+                    const SizedBox(height: 24),
+                    const ResponsibleDrinkingBanner(),
+                    if (_nearbyStores.isNotEmpty) ...[
+                      const SizedBox(height: 32),
+                      Text('Liquor Stores',
+                          style: theme.textTheme.titleLarge
+                              ?.copyWith(fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 16),
+                      ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: _nearbyStores.length,
+                        separatorBuilder: (context, index) =>
+                            const SizedBox(height: 16),
+                        itemBuilder: (context, index) =>
+                            StoreCard(store: _nearbyStores[index]),
+                      ),
+                    ] else if (!_isLoading) ...[
+                      const SizedBox(height: 24),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.errorContainer
+                              .withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color:
+                                theme.colorScheme.error.withValues(alpha: 0.1),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.location_off_rounded,
+                                color: theme.colorScheme.error),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'No liquor stores available',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: theme.colorScheme.error,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    if (_nearbyStores.isEmpty && !_isLoading) ...[
+                      const SizedBox(height: 48),
+                      Center(
+                        child: Column(
+                          children: [
+                            Icon(Icons.search_off_rounded,
+                                size: 64,
+                                color: theme.colorScheme.onSurface
+                                    .withValues(alpha: 0.2)),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Explore categories to see what we offer\nin other regions!',
+                              textAlign: TextAlign.center,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.onSurface
+                                    .withValues(alpha: 0.5),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -490,290 +578,6 @@ class ResponsibleDrinkingBanner extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class CategoryGrid extends StatefulWidget {
-  const CategoryGrid({super.key});
-
-  @override
-  State<CategoryGrid> createState() => _CategoryGridState();
-}
-
-class _CategoryGridState extends State<CategoryGrid> {
-  final List<Map<String, dynamic>> categories = [
-    {
-      'name': 'Beer',
-      'icon': Icons.sports_bar,
-      'category': ProductCategory.beer
-    },
-    {'name': 'Wine', 'icon': Icons.wine_bar, 'category': ProductCategory.wine},
-    {
-      'name': 'Spirits',
-      'icon': Icons.local_bar,
-      'category': ProductCategory.spirits
-    },
-    {
-      'name': 'Mixers',
-      'icon': Icons.local_drink,
-      'category': ProductCategory.mixers
-    },
-    {
-      'name': 'Snacks',
-      'icon': Icons.fastfood,
-      'category': ProductCategory.snacks
-    },
-  ];
-  int? _hoveredIndex;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return SizedBox(
-      height: 100,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: categories.length,
-        itemBuilder: (context, index) {
-          final category = categories[index];
-          final isHover = _hoveredIndex == index;
-          final labelColor = isHover
-              ? theme.colorScheme.secondary
-              : theme.colorScheme.onSurface;
-          final iconColor = isHover
-              ? theme.colorScheme.secondary
-              : theme.colorScheme.onSurface;
-          return MouseRegion(
-            onEnter: (_) => setState(() => _hoveredIndex = index),
-            onExit: (_) => setState(() => _hoveredIndex = null),
-            child: GestureDetector(
-              onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (_) =>
-                          CategoryScreen(category: category['category']))),
-              child: Container(
-                width: 80,
-                margin: const EdgeInsets.only(right: 16),
-                child: Column(
-                  children: [
-                    Container(
-                      width: 64,
-                      height: 64,
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.primaryContainer,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Icon(category['icon'], color: iconColor, size: 32),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(category['name'],
-                        style: theme.textTheme.bodySmall
-                            ?.copyWith(color: labelColor),
-                        textAlign: TextAlign.center),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-class ProductCard extends StatefulWidget {
-  final Product product;
-
-  const ProductCard({super.key, required this.product});
-
-  @override
-  State<ProductCard> createState() => _ProductCardState();
-}
-
-class _ProductCardState extends State<ProductCard> {
-  bool _isHovering = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final textColor =
-        _isHovering ? theme.colorScheme.secondary : theme.colorScheme.onSurface;
-    final promoService = PromotionService();
-
-    return MouseRegion(
-      onEnter: (_) => setState(() => _isHovering = true),
-      onExit: (_) => setState(() => _isHovering = false),
-      child: GestureDetector(
-        onTap: () async {
-          await Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (_) =>
-                      ProductDetailScreen(product: widget.product)));
-          if (context.mounted) {
-            (context.findAncestorStateOfType<_HomeScreenState>())
-                ?._loadProducts();
-          }
-        },
-        child: Container(
-          width: 160,
-          margin: const EdgeInsets.only(right: 16),
-          child: Card(
-            color: theme.colorScheme.surface,
-            elevation: 2,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: BorderSide(
-                color: theme.colorScheme.outline.withValues(alpha: 0.1),
-                width: 1,
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Top visual area scales to available height to avoid overflow
-                Expanded(
-                  child: AnimatedBuilder(
-                    animation: promoService,
-                    builder: (context, _) {
-                      final promo =
-                          promoService.promotionForProduct(widget.product.id);
-
-                      final image = widget.product.imageUrl.isNotEmpty
-                          ? CachedNetworkImage(
-                              imageUrl: widget.product.imageUrl,
-                              imageBuilder: (context, imageProvider) =>
-                                  Container(
-                                padding: const EdgeInsets.only(top: 16),
-                                decoration: BoxDecoration(
-                                  color: theme.colorScheme.surface,
-                                  borderRadius: const BorderRadius.vertical(
-                                      top: Radius.circular(12)),
-                                ),
-                                child: Image(
-                                  image: imageProvider,
-                                  fit: BoxFit.contain,
-                                  width: double.infinity,
-                                ),
-                              ),
-                              placeholder: (context, url) => Container(
-                                decoration: BoxDecoration(
-                                  color:
-                                      theme.colorScheme.surfaceContainerHighest,
-                                  borderRadius: const BorderRadius.vertical(
-                                      top: Radius.circular(12)),
-                                ),
-                                child: Center(
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: theme.colorScheme.primary
-                                        .withValues(alpha: 0.3),
-                                  ),
-                                ),
-                              ),
-                              errorWidget: (context, url, error) => Container(
-                                decoration: BoxDecoration(
-                                  color:
-                                      theme.colorScheme.surfaceContainerHighest,
-                                  borderRadius: const BorderRadius.vertical(
-                                      top: Radius.circular(12)),
-                                ),
-                                child: Center(
-                                  child: Icon(Icons.local_bar,
-                                      size: 48,
-                                      color: theme.colorScheme.onSurface
-                                          .withValues(alpha: 0.3)),
-                                ),
-                              ),
-                            )
-                          : Container(
-                              decoration: BoxDecoration(
-                                color:
-                                    theme.colorScheme.surfaceContainerHighest,
-                                borderRadius: const BorderRadius.vertical(
-                                    top: Radius.circular(12)),
-                              ),
-                              child: Center(
-                                child: Icon(Icons.local_bar,
-                                    size: 48,
-                                    color: theme.colorScheme.onSurface
-                                        .withValues(alpha: 0.3)),
-                              ),
-                            );
-
-                      return Stack(
-                        children: [
-                          Positioned.fill(child: image),
-                          if (promo != null)
-                            Positioned(
-                              top: 12,
-                              left: 12,
-                              child: PromoBadge(text: promo.badgeText),
-                            ),
-                        ],
-                      );
-                    },
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (widget.product.isLocalBrand) ...[
-                        Row(
-                          children: [
-                            Icon(Icons.flag,
-                                size: 12,
-                                color: _isHovering
-                                    ? theme.colorScheme.secondary
-                                    : Colors.green),
-                            const SizedBox(width: 4),
-                            Text('Local',
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                    color: _isHovering
-                                        ? theme.colorScheme.secondary
-                                        : Colors.green,
-                                    fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                      ],
-                      Text(
-                        widget.product.name,
-                        style: theme.textTheme.titleSmall
-                            ?.copyWith(color: textColor),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 4),
-                      if (widget.product.volume != null)
-                        Text(
-                          widget.product.volume!,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                              color: _isHovering
-                                  ? theme.colorScheme.secondary
-                                  : theme.colorScheme.onSurface
-                                      .withValues(alpha: 0.6)),
-                        ),
-                      const SizedBox(height: 8),
-                      Text(
-                        Formatters.formatCurrency(widget.product.price),
-                        style: theme.textTheme.titleMedium?.copyWith(
-                            color: textColor, fontWeight: FontWeight.bold),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
       ),
     );
   }

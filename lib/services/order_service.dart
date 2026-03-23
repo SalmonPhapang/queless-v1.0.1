@@ -1,9 +1,11 @@
-import 'package:flutter/foundation.dart';
+import 'package:queless/logger.dart';
 import 'package:queless/models/order.dart';
 import 'package:queless/models/user.dart';
 import 'package:queless/services/auth_service.dart';
+import 'package:queless/services/cache_service.dart';
 import 'package:queless/services/cart_service.dart';
 import 'package:queless/services/food_cart_service.dart';
+import 'package:queless/services/promo_code_service.dart';
 import 'package:queless/supabase/supabase_config.dart';
 import 'package:queless/utils/id_generator.dart';
 
@@ -13,22 +15,34 @@ class OrderService {
   OrderService._internal();
 
   final _authService = AuthService();
+  final _cache = CacheService();
   final _cartService = CartService();
   final _foodCartService = FoodCartService();
 
   Future<void> init() async {}
 
+  void _invalidateCache(String? orderId) {
+    final user = _authService.currentUser;
+    if (user != null) {
+      _cache.invalidate('user_orders_${user.id}');
+    }
+    if (orderId != null) {
+      _cache.invalidate('order_$orderId');
+    }
+  }
+
   Future<Order> createOrder({
+    required String storeId,
     required Address deliveryAddress,
     required String paymentMethod,
     DateTime? scheduledDelivery,
   }) async {
     final user = _authService.currentUser;
-    final cart = _cartService.currentCart;
+    final cart = _cartService.carts[storeId];
 
     if (user == null || cart == null || cart.items.isEmpty) {
       throw Exception(
-          'Cannot create order: user not logged in or cart is empty');
+          'Cannot create order: user not logged in or cart for store $storeId is empty');
     }
 
     final now = DateTime.now();
@@ -43,11 +57,14 @@ class OrderService {
             ))
         .toList();
 
-    final subtotal = _cartService.subtotal;
-    final deliveryFee = _cartService.deliveryFee;
-    final discount = _cartService.calculateDiscount();
-    final total = _cartService.calculateTotal();
+    final subtotal = _cartService.getSubtotal(storeId);
+    final deliveryFee = _cartService.getDeliveryFee(storeId);
+    final discount = _cartService.calculateDiscount(storeId);
+    final total = _cartService.calculateTotal(storeId);
+    final promoCodeId = _cartService.getAppliedPromo(storeId)?.id;
     final orderNumber = IdGenerator.generateOrderNumber();
+
+    final isCod = paymentMethod == 'Cash on Delivery';
 
     final orderData = {
       'user_id': user.id,
@@ -57,10 +74,11 @@ class OrderService {
       'delivery_fee': deliveryFee,
       'discount': discount,
       'total': total,
-      'status': OrderStatus.pending.name,
+      'status': isCod ? OrderStatus.confirmed.name : OrderStatus.pending.name,
       'delivery_address': deliveryAddress.toJson(),
       'payment_method': paymentMethod,
-      'payment_status': PaymentStatus.pending.name,
+      'payment_status':
+          isCod ? PaymentStatus.completed.name : PaymentStatus.pending.name,
       'scheduled_delivery': scheduledDelivery?.toIso8601String(),
       'tracking_updates': [
         {
@@ -71,30 +89,42 @@ class OrderService {
       ],
       'created_at': now.toIso8601String(),
       'updated_at': now.toIso8601String(),
+      'store_id': storeId,
+      'promo_code_id': promoCodeId,
+      'type': 'Liquor',
     };
 
     try {
       final result = await SupabaseService.insert('orders', orderData);
-      await _cartService.clear();
 
-      return Order.fromJson(result.first);
+      // Increment promo usage if applicable
+      if (promoCodeId != null) {
+        await PromoCodeService().incrementUsage(promoCodeId);
+      }
+
+      await _cartService.clear(storeId);
+
+      final order = Order.fromJson(result.first);
+      _invalidateCache(null); // Invalidate user list cache
+      return order;
     } catch (e) {
-      debugPrint('Error creating order: $e');
+      Logger.debug('Error creating order: $e');
       rethrow;
     }
   }
 
   Future<Order> createFoodOrder({
+    required String storeId,
     required Address deliveryAddress,
     required String paymentMethod,
     DateTime? scheduledDelivery,
   }) async {
     final user = _authService.currentUser;
-    final cart = _foodCartService.currentCart;
+    final cart = _foodCartService.carts[storeId];
 
     if (user == null || cart == null || cart.items.isEmpty) {
       throw Exception(
-          'Cannot create order: user not logged in or cart is empty');
+          'Cannot create order: user not logged in or food cart for store $storeId is empty');
     }
 
     final now = DateTime.now();
@@ -111,11 +141,11 @@ class OrderService {
         )
         .toList();
 
-    final subtotal = _foodCartService.subtotal;
-    final deliveryFee = _foodCartService.deliveryFee;
-    final discount = _foodCartService.calculateDiscount();
-    final total = _foodCartService.calculateTotal();
-    final storeId = _foodCartService.currentStoreId;
+    final subtotal = _foodCartService.getSubtotal(storeId);
+    final deliveryFee = _foodCartService.getDeliveryFee(storeId);
+    final discount = _foodCartService.calculateDiscount(storeId);
+    final total = _foodCartService.calculateTotal(storeId);
+    final promoCodeId = _foodCartService.getAppliedPromo(storeId)?.id;
     final orderNumber = IdGenerator.generateOrderNumber();
 
     final orderData = {
@@ -141,15 +171,25 @@ class OrderService {
       'created_at': now.toIso8601String(),
       'updated_at': now.toIso8601String(),
       'store_id': storeId,
+      'promo_code_id': promoCodeId,
+      'type': 'Food',
     };
 
     try {
       final result = await SupabaseService.insert('orders', orderData);
-      await _foodCartService.clear();
 
-      return Order.fromJson(result.first);
+      // Increment promo usage if applicable
+      if (promoCodeId != null) {
+        await PromoCodeService().incrementUsage(promoCodeId);
+      }
+
+      await _foodCartService.clear(storeId);
+
+      final order = Order.fromJson(result.first);
+      _invalidateCache(null); // Invalidate user list cache
+      return order;
     } catch (e) {
-      debugPrint('Error creating food order: $e');
+      Logger.debug('Error creating food order: $e');
       rethrow;
     }
   }
@@ -157,6 +197,10 @@ class OrderService {
   Future<List<Order>> getUserOrders() async {
     final user = _authService.currentUser;
     if (user == null) return [];
+
+    final cacheKey = 'user_orders_${user.id}';
+    final cachedOrders = _cache.get<List<Order>>(cacheKey);
+    if (cachedOrders != null) return cachedOrders;
 
     try {
       final data = await SupabaseService.select(
@@ -171,21 +215,23 @@ class OrderService {
             try {
               return Order.fromJson(json);
             } catch (e) {
-              debugPrint('Skipping malformed order: $e');
+              Logger.debug('Skipping malformed order: $e');
               return null;
             }
           })
           .whereType<Order>()
           .toList();
 
+      _cache.set(cacheKey, orders, duration: const Duration(minutes: 5));
+
       // Run stale order cancellation in background
       _autoCancelStalePendingOrders(orders).catchError((e) {
-        debugPrint('Error in auto-cancel background task: $e');
+        Logger.debug('Error in auto-cancel background task: $e');
       });
 
       return orders;
     } catch (e) {
-      debugPrint('Error getting user orders: $e');
+      Logger.debug('Error getting user orders: $e');
       rethrow;
     }
   }
@@ -209,15 +255,23 @@ class OrderService {
   }
 
   Future<Order?> getOrderById(String orderId) async {
+    final cacheKey = 'order_$orderId';
+    final cachedOrder = _cache.get<Order>(cacheKey);
+    if (cachedOrder != null) return cachedOrder;
+
     try {
       final data = await SupabaseService.selectSingle(
         'orders',
         filters: {'id': orderId},
       );
 
-      return data != null ? Order.fromJson(data) : null;
+      final order = data != null ? Order.fromJson(data) : null;
+      if (order != null) {
+        _cache.set(cacheKey, order, duration: const Duration(minutes: 5));
+      }
+      return order;
     } catch (e) {
-      debugPrint('Error getting order by id: $e');
+      Logger.debug('Error getting order by id: $e');
       return null;
     }
   }
@@ -265,8 +319,9 @@ class OrderService {
         updateData,
         filters: {'id': orderId},
       );
+      _invalidateCache(orderId);
     } catch (e) {
-      debugPrint('Error updating order status: $e');
+      Logger.debug('Error updating order status: $e');
     }
   }
 
@@ -290,8 +345,9 @@ class OrderService {
         updateData,
         filters: {'id': orderId},
       );
+      _invalidateCache(orderId);
     } catch (e) {
-      debugPrint('Error updating order payment status: $e');
+      Logger.debug('Error updating order payment status: $e');
     }
   }
 

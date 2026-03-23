@@ -22,7 +22,7 @@ class _OrdersScreenState extends State<OrdersScreen>
   List<Order> _activeOrders = [];
   List<Order> _orderHistory = [];
   bool _isLoading = true;
-  Map<String, String> _orderTypeLabels = {};
+  final Map<String, String> _orderTypeLabels = {};
 
   @override
   void initState() {
@@ -43,35 +43,11 @@ class _OrdersScreenState extends State<OrdersScreen>
     try {
       final active = await _orderService.getActiveOrders();
       final history = await _orderService.getOrderHistory();
-      final typeLabels = <String, String>{};
 
       if (mounted) {
         setState(() {
           _activeOrders = active;
           _orderHistory = history;
-        });
-      }
-
-      final allOrders = [...active, ...history];
-      for (final order in allOrders) {
-        if (order.items.isEmpty) continue;
-        final firstItem = order.items.first;
-        try {
-          final product =
-              await _productService.getProductById(firstItem.productId);
-          if (product != null) {
-            final label =
-                product.productType == ProductType.food ? 'Food' : 'Alcohol';
-            typeLabels[order.id] = label;
-          }
-        } catch (e) {
-          debugPrint('Error fetching product label for order ${order.id}: $e');
-        }
-      }
-
-      if (mounted) {
-        setState(() {
-          _orderTypeLabels = typeLabels;
           _isLoading = false;
         });
       }
@@ -135,8 +111,7 @@ class _OrdersScreenState extends State<OrdersScreen>
         itemCount: orders.length,
         itemBuilder: (context, index) {
           final order = orders[index];
-          final typeLabel = _orderTypeLabels[order.id] ?? 'Alcohol';
-          return OrderCard(order: order, orderTypeLabel: typeLabel);
+          return OrderCard(order: order);
         },
       ),
     );
@@ -145,10 +120,8 @@ class _OrdersScreenState extends State<OrdersScreen>
 
 class OrderCard extends StatelessWidget {
   final Order order;
-  final String orderTypeLabel;
 
-  const OrderCard(
-      {super.key, required this.order, required this.orderTypeLabel});
+  const OrderCard({super.key, required this.order});
 
   Color _getStatusColor(OrderStatus status, BuildContext context) {
     final theme = Theme.of(context);
@@ -168,7 +141,7 @@ class OrderCard extends StatelessWidget {
 
   Color _getOrderTypeColor(BuildContext context) {
     final theme = Theme.of(context);
-    if (orderTypeLabel.toLowerCase() == 'food') {
+    if (order.type.toLowerCase() == 'food') {
       return theme.colorScheme.secondary;
     }
     return theme.colorScheme.primary;
@@ -239,7 +212,7 @@ class OrderCard extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
-                          orderTypeLabel.toLowerCase() == 'food'
+                          order.type.toLowerCase() == 'food'
                               ? Icons.restaurant
                               : Icons.local_bar,
                           size: 14,
@@ -247,7 +220,7 @@ class OrderCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 6),
                         Text(
-                          '$orderTypeLabel order',
+                          '${order.type} order',
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: _getOrderTypeColor(context),
                             fontWeight: FontWeight.w600,

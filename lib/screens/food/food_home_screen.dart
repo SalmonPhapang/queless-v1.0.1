@@ -5,8 +5,8 @@ import 'package:queless/services/store_service.dart';
 import 'package:queless/services/auth_service.dart';
 import 'package:queless/services/location_service.dart';
 import 'package:queless/screens/auth/permission_request_screen.dart';
+import 'package:queless/screens/home/store_card.dart';
 import 'package:queless/screens/food/store_detail_screen.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:queless/models/promotion.dart';
 import 'package:queless/services/product_service.dart';
 import 'package:queless/services/promotion_service.dart';
@@ -96,7 +96,8 @@ class _FoodHomeScreenState extends State<FoodHomeScreen> {
         final stores = await _storeService.getNearbyStores(
           latitude: position.latitude,
           longitude: position.longitude,
-          radiusMeters: 5000, // 5km range
+          radiusMeters: 50000, // Increased to 50km for testing
+          category: 'restaurant',
         );
 
         setState(() {
@@ -109,13 +110,15 @@ class _FoodHomeScreenState extends State<FoodHomeScreen> {
           _maybeShowPromotion();
         });
       } else {
-        // Fallback to all open stores if location denied/unavailable
-        debugPrint('⚠️ Location unavailable, falling back to all open stores');
-        final stores = await _storeService.getOpenStores();
+        // Fallback to all open food stores if location denied/unavailable
+        debugPrint(
+            '⚠️ Location unavailable, falling back to all open food stores');
+        final stores =
+            await _storeService.getOpenStores(category: 'restaurant');
         setState(() {
           _stores = stores;
           _isLoading = false;
-          _locationError = 'Location unavailable. Showing all stores.';
+          _locationError = 'Location unavailable. Showing all food stores.';
         });
         await _promotionService.refreshActivePromotions();
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -381,175 +384,6 @@ class CategoryChips extends StatelessWidget {
             ),
           );
         },
-      ),
-    );
-  }
-}
-
-class StoreCard extends StatelessWidget {
-  final Store store;
-
-  const StoreCard({super.key, required this.store});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final promoService = PromotionService();
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      child: InkWell(
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => StoreDetailScreen(store: store)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            AnimatedBuilder(
-              animation: promoService,
-              builder: (context, _) {
-                final promo = promoService.promotionForStore(store.id);
-
-                final image = store.imageUrl.isNotEmpty
-                    ? CachedNetworkImage(
-                        imageUrl: store.imageUrl,
-                        imageBuilder: (context, imageProvider) => Container(
-                          height: 160,
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.surfaceContainerHighest,
-                            borderRadius: const BorderRadius.vertical(
-                                top: Radius.circular(12)),
-                            image: DecorationImage(
-                              image: imageProvider,
-                              fit: BoxFit.cover,
-                            ),
-                          ),
-                        ),
-                        placeholder: (context, url) => Container(
-                          height: 160,
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.surfaceContainerHighest,
-                            borderRadius: const BorderRadius.vertical(
-                                top: Radius.circular(12)),
-                          ),
-                          child: Center(
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: theme.colorScheme.primary
-                                  .withValues(alpha: 0.3),
-                            ),
-                          ),
-                        ),
-                        errorWidget: (context, url, error) => Container(
-                          height: 160,
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.surfaceContainerHighest,
-                            borderRadius: const BorderRadius.vertical(
-                                top: Radius.circular(12)),
-                          ),
-                          child: Center(
-                            child: Icon(Icons.restaurant_menu,
-                                size: 64,
-                                color: theme.colorScheme.primary
-                                    .withValues(alpha: 0.3)),
-                          ),
-                        ),
-                      )
-                    : Container(
-                        height: 160,
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.surfaceContainerHighest,
-                          borderRadius: const BorderRadius.vertical(
-                              top: Radius.circular(12)),
-                        ),
-                        child: Center(
-                          child: Icon(
-                            Icons.restaurant_menu,
-                            size: 64,
-                            color: theme.colorScheme.primary
-                                .withValues(alpha: 0.3),
-                          ),
-                        ),
-                      );
-
-                return Stack(
-                  children: [
-                    image,
-                    if (promo != null)
-                      Positioned(
-                        top: 12,
-                        left: 12,
-                        child: PromoBadge(text: promo.badgeText),
-                      ),
-                  ],
-                );
-              },
-            ),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          store.name,
-                          style: theme.textTheme.titleMedium
-                              ?.copyWith(fontWeight: FontWeight.bold),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      if (!store.isOpen)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.errorContainer,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text('Closed',
-                              style: theme.textTheme.bodySmall
-                                  ?.copyWith(color: theme.colorScheme.error)),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    store.cuisineTypes.join(' • '),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                        color:
-                            theme.colorScheme.onSurface.withValues(alpha: 0.6)),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Icon(Icons.star, size: 16, color: Colors.amber),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${store.rating.toStringAsFixed(1)} (${store.totalReviews})',
-                        style: theme.textTheme.bodySmall,
-                      ),
-                      const SizedBox(width: 16),
-                      Icon(Icons.delivery_dining,
-                          size: 16, color: theme.colorScheme.primary),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${store.deliveryTimeMin}-${store.deliveryTimeMax} min',
-                        style: theme.textTheme.bodySmall,
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

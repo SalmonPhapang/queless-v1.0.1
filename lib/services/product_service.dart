@@ -1,5 +1,6 @@
-import 'package:flutter/foundation.dart';
+import 'package:queless/logger.dart';
 import 'package:queless/models/product.dart';
+import 'package:queless/services/cache_service.dart';
 import 'package:queless/supabase/supabase_config.dart';
 
 class ProductService {
@@ -7,32 +8,26 @@ class ProductService {
   factory ProductService() => _instance;
   ProductService._internal();
 
-  List<Product> _cachedProducts = [];
+  final _cache = CacheService();
 
-  Future<void> init() async {
-    await _loadProducts();
-  }
+  Future<List<Product>> getAllProducts() async {
+    const cacheKey = 'all_products';
+    final cached = _cache.get<List<Product>>(cacheKey);
+    if (cached != null) return cached;
 
-  Future<void> _loadProducts() async {
     try {
       final data = await SupabaseService.select(
         'products',
         orderBy: 'created_at',
         ascending: false,
       );
-
-      _cachedProducts = data.map((json) => Product.fromJson(json)).toList();
+      final products = data.map((json) => Product.fromJson(json)).toList();
+      _cache.set(cacheKey, products);
+      return products;
     } catch (e) {
-      debugPrint('Error loading products: $e');
-      _cachedProducts = [];
+      Logger.debug('Error loading products: $e');
+      return [];
     }
-  }
-
-  Future<List<Product>> getAllProducts() async {
-    if (_cachedProducts.isEmpty) {
-      await _loadProducts();
-    }
-    return List.from(_cachedProducts);
   }
 
   Future<List<Product>> getProductsByCategory(ProductCategory category) async {
@@ -46,7 +41,7 @@ class ProductService {
 
       return data.map((json) => Product.fromJson(json)).toList();
     } catch (e) {
-      debugPrint('Error getting products by category: $e');
+      Logger.debug('Error getting products by category: $e');
       return [];
     }
   }
@@ -54,12 +49,13 @@ class ProductService {
   Future<List<Product>> searchProducts(String query) async {
     final products = await getAllProducts();
     final lowerQuery = query.toLowerCase();
-    return products.where((p) =>
-      p.name.toLowerCase().contains(lowerQuery) ||
-      (p.brand?.toLowerCase().contains(lowerQuery) ?? false) ||
-      p.description.toLowerCase().contains(lowerQuery) ||
-      p.tags.any((tag) => tag.toLowerCase().contains(lowerQuery))
-    ).toList();
+    return products
+        .where((p) =>
+            p.name.toLowerCase().contains(lowerQuery) ||
+            (p.brand?.toLowerCase().contains(lowerQuery) ?? false) ||
+            p.description.toLowerCase().contains(lowerQuery) ||
+            p.tags.any((tag) => tag.toLowerCase().contains(lowerQuery)))
+        .toList();
   }
 
   Future<List<Product>> getLocalBrandProducts() async {
@@ -73,7 +69,7 @@ class ProductService {
 
       return data.map((json) => Product.fromJson(json)).toList();
     } catch (e) {
-      debugPrint('Error getting local brand products: $e');
+      Logger.debug('Error getting local brand products: $e');
       return [];
     }
   }
@@ -87,21 +83,45 @@ class ProductService {
 
       return data.map((json) => Product.fromJson(json)).toList();
     } catch (e) {
-      debugPrint('Error getting featured products: $e');
+      Logger.debug('Error getting featured products: $e');
+      return [];
+    }
+  }
+
+  Future<List<Product>> getProductsByStoreId(String storeId) async {
+    try {
+      final data = await SupabaseService.select(
+        'products',
+        filters: {'store_id': storeId},
+        orderBy: 'name',
+        ascending: true,
+      );
+
+      return data.map((json) => Product.fromJson(json)).toList();
+    } catch (e) {
+      Logger.debug('Error getting products by store id: $e');
       return [];
     }
   }
 
   Future<Product?> getProductById(String id) async {
+    final cacheKey = 'product_$id';
+    final cachedProduct = _cache.get<Product>(cacheKey);
+    if (cachedProduct != null) return cachedProduct;
+
     try {
       final data = await SupabaseService.selectSingle(
         'products',
         filters: {'id': id},
       );
 
-      return data != null ? Product.fromJson(data) : null;
+      final product = data != null ? Product.fromJson(data) : null;
+      if (product != null) {
+        _cache.set(cacheKey, product);
+      }
+      return product;
     } catch (e) {
-      debugPrint('Error getting product by id: $e');
+      Logger.debug('Error getting product by id: $e');
       return null;
     }
   }
@@ -124,7 +144,7 @@ class ProductService {
 
       return data.map((json) => Product.fromJson(json)).toList();
     } catch (e) {
-      debugPrint('Error getting products by type: $e');
+      Logger.debug('Error getting products by type: $e');
       return [];
     }
   }
@@ -138,19 +158,19 @@ class ProductService {
         ascending: true,
       );
 
-      debugPrint('📦 Loading ${data.length} products for store $storeId');
+      Logger.debug('📦 Loading ${data.length} products for store $storeId');
       return data.map((json) {
         try {
           return Product.fromJson(json);
         } catch (e) {
-          debugPrint('Error parsing product: ${json['name']} - $e');
-          debugPrint('Product data: $json');
+          Logger.debug('Error parsing product: ${json['name']} - $e');
+          Logger.debug('Product data: $json');
           rethrow;
         }
       }).toList();
     } catch (e, stackTrace) {
-      debugPrint('Error getting products by store: $e');
-      debugPrint('Stack trace: $stackTrace');
+      Logger.debug('Error getting products by store: $e');
+      Logger.debug('Stack trace: $stackTrace');
       return [];
     }
   }

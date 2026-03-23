@@ -1,5 +1,6 @@
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter/foundation.dart';
+import 'package:geocoding/geocoding.dart';
 
 class LocationService {
   static final LocationService _instance = LocationService._internal();
@@ -69,5 +70,20 @@ class LocationService {
   double calculateDistance(
       double startLat, double startLng, double endLat, double endLng) {
     return Geolocator.distanceBetween(startLat, startLng, endLat, endLng);
+  }
+
+  Future<String> getAddressFromCoordinates(
+      double latitude, double longitude) async {
+    try {
+      List<Placemark> placemarks =
+          await placemarkFromCoordinates(latitude, longitude);
+      if (placemarks.isNotEmpty) {
+        final placemark = placemarks.first;
+        return '${placemark.street}, ${placemark.locality}';
+      }
+      return 'Address not found';
+    } catch (e) {
+      return 'Error getting address';
+    }
   }
 }

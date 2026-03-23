@@ -20,6 +20,8 @@ class Store {
   final DateTime createdAt;
   final DateTime updatedAt;
 
+  final String? nextOpeningTime; // e.g. "Tomorrow at 9am"
+
   Store({
     required this.id,
     required this.name,
@@ -41,6 +43,7 @@ class Store {
     required this.tags,
     required this.createdAt,
     required this.updatedAt,
+    this.nextOpeningTime,
   });
 
   Map<String, dynamic> toJson() => {
@@ -64,6 +67,7 @@ class Store {
         'tags': tags,
         'created_at': createdAt.toIso8601String(),
         'updated_at': updatedAt.toIso8601String(),
+        'next_opening_time': nextOpeningTime,
       };
 
   factory Store.fromJson(Map<String, dynamic> json) => Store(
@@ -90,6 +94,7 @@ class Store {
         tags: (json['tags'] as List?)?.map((e) => e as String).toList() ?? [],
         createdAt: DateTime.parse(json['created_at'] as String),
         updatedAt: DateTime.parse(json['updated_at'] as String),
+        nextOpeningTime: json['next_opening_time'] as String?,
       );
 
   Store copyWith({
@@ -113,6 +118,7 @@ class Store {
     List<String>? tags,
     DateTime? createdAt,
     DateTime? updatedAt,
+    String? nextOpeningTime,
   }) {
     return Store(
       id: id ?? this.id,
@@ -135,6 +141,7 @@ class Store {
       tags: tags ?? this.tags,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      nextOpeningTime: nextOpeningTime ?? this.nextOpeningTime,
     );
   }
 }

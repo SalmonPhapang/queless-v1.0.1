@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:queless/models/product.dart';
 import 'package:queless/services/product_service.dart';
+import 'package:queless/services/location_service.dart';
+import 'package:queless/services/store_service.dart';
+import 'package:queless/services/cart_service.dart';
+import 'package:queless/models/store.dart';
 import 'package:queless/screens/product/product_detail_screen.dart';
 import 'package:queless/utils/formatters.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -19,8 +23,14 @@ class CategoryScreen extends StatefulWidget {
 class _CategoryScreenState extends State<CategoryScreen> {
   final _productService = ProductService();
   final _promotionService = PromotionService();
+  final _locationService = LocationService();
+  final _storeService = StoreService();
+  final _cartService = CartService();
+
   List<Product> _products = [];
   bool _isLoading = true;
+  Store? _nearestStore;
+  double? _distanceToStore;
 
   @override
   void initState() {
@@ -29,23 +39,78 @@ class _CategoryScreenState extends State<CategoryScreen> {
   }
 
   Future<void> _initData() async {
-    await Future.wait([
-      _loadProducts(),
-      _promotionService.refreshActivePromotions(),
-    ]);
+    setState(() => _isLoading = true);
+    await _promotionService.refreshActivePromotions();
+    await _findNearestStore();
+    await _loadProducts();
+  }
+
+  Future<void> _findNearestStore() async {
+    final position = await _locationService.getCurrentLocation();
+    if (position == null) return;
+
+    final store = await _storeService.findNearestStore(
+      latitude: position.latitude,
+      longitude: position.longitude,
+      category: 'liquor',
+    );
+
+    if (store != null && store.location.isNotEmpty) {
+      final parts = store.location.split(',');
+      if (parts.length == 2) {
+        final storeLat = double.parse(parts[0].trim());
+        final storeLng = double.parse(parts[1].trim());
+        final distance = _locationService.calculateDistance(
+          position.latitude,
+          position.longitude,
+          storeLat,
+          storeLng,
+        );
+
+        final distanceKm = distance / 1000;
+
+        setState(() {
+          _nearestStore = store;
+          _distanceToStore = distanceKm;
+        });
+      }
+    }
   }
 
   Future<void> _loadProducts() async {
     setState(() => _isLoading = true);
     try {
-      final products =
-          await _productService.getProductsByCategory(widget.category);
-      setState(() {
-        _products = products;
-        _isLoading = false;
-      });
+      List<Product> productsToLoad;
+
+      if (_nearestStore != null) {
+        debugPrint(
+            '🔍 CategoryScreen: Fetching products for category ${widget.category.name} and store ${_nearestStore!.id}');
+        // Load products specifically from the nearest store and category
+        final storeProducts =
+            await _productService.getProductsByStoreId(_nearestStore!.id);
+
+        productsToLoad =
+            storeProducts.where((p) => p.category == widget.category).toList();
+        debugPrint(
+            '🔍 CategoryScreen: Found ${productsToLoad.length} products');
+      } else {
+        debugPrint(
+            '🔍 CategoryScreen: Loading all products for category ${widget.category.name}');
+        productsToLoad =
+            await _productService.getProductsByCategory(widget.category);
+      }
+
+      if (mounted) {
+        setState(() {
+          _products = productsToLoad;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      setState(() => _isLoading = false);
+      debugPrint('❌ CategoryScreen: Error loading products: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -55,26 +120,79 @@ class _CategoryScreenState extends State<CategoryScreen> {
 
     return Scaffold(
       appBar: AppBar(title: Text(widget.category.displayName)),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _products.isEmpty
-              ? Center(
-                  child: Text('No products in this category',
-                      style: theme.textTheme.titleMedium))
-              : GridView.builder(
-                  padding: const EdgeInsets.all(20),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    childAspectRatio: 0.7,
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
+      body: Column(
+        children: [
+          if (_nearestStore != null)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              color: theme.colorScheme.primary.withValues(alpha: 0.1),
+              child: Row(
+                children: [
+                  Icon(Icons.store, color: theme.colorScheme.primary),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Ordering from: ${_nearestStore!.name}',
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          '${_distanceToStore!.toStringAsFixed(1)}km away • Delivery: ${Formatters.formatCurrency(_cartService.getDeliveryFee(_nearestStore!.id))}',
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
                   ),
-                  itemCount: _products.length,
-                  itemBuilder: (context, index) {
-                    final product = _products[index];
-                    return _HoverProductCard(product: product);
-                  },
-                ),
+                ],
+              ),
+            ),
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _products.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.search_off,
+                              size: 64,
+                              color: theme.colorScheme.onSurface
+                                  .withValues(alpha: 0.3),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              _nearestStore == null
+                                  ? 'No liquor stores available nearby'
+                                  : 'No products in this category from ${_nearestStore!.name}',
+                              textAlign: TextAlign.center,
+                              style: theme.textTheme.titleMedium,
+                            ),
+                          ],
+                        ),
+                      )
+                    : GridView.builder(
+                        padding: const EdgeInsets.all(20),
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          childAspectRatio: 0.7,
+                          crossAxisSpacing: 16,
+                          mainAxisSpacing: 16,
+                        ),
+                        itemCount: _products.length,
+                        itemBuilder: (context, index) {
+                          final product = _products[index];
+                          return _HoverProductCard(product: product);
+                        },
+                      ),
+          ),
+        ],
+      ),
     );
   }
 }

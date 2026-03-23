@@ -163,8 +163,10 @@ class Order {
   final DateTime createdAt;
   final DateTime updatedAt;
   final String? storeId;
+  final String? promoCodeId;
+  final String type; // 'Liquor' or 'Food'
 
-  String get orderType => storeId != null ? 'Food' : 'Alcohol';
+  String get orderType => type;
 
   Order({
     required this.id,
@@ -188,6 +190,8 @@ class Order {
     required this.createdAt,
     required this.updatedAt,
     this.storeId,
+    this.promoCodeId,
+    required this.type,
   });
 
   Map<String, dynamic> toJson() => {
@@ -212,6 +216,8 @@ class Order {
         'created_at': createdAt.toIso8601String(),
         'updated_at': updatedAt.toIso8601String(),
         'store_id': storeId,
+        'promo_code_id': promoCodeId,
+        'type': type,
       };
 
   factory Order.fromJson(Map<String, dynamic> json) {
@@ -260,6 +266,9 @@ class Order {
         updatedAt: DateTime.tryParse(json['updated_at']?.toString() ?? '') ??
             DateTime.now(),
         storeId: json['store_id']?.toString(),
+        promoCodeId: json['promo_code_id']?.toString(),
+        type: json['type']?.toString() ??
+            (json['store_id'] != null ? 'Liquor' : 'Food'),
       );
     } catch (e) {
       debugPrint('Error parsing Order from JSON: $e');
@@ -289,6 +298,8 @@ class Order {
     DateTime? createdAt,
     DateTime? updatedAt,
     String? storeId,
+    String? promoCodeId,
+    String? type,
   }) =>
       Order(
         id: id ?? this.id,
@@ -313,6 +324,8 @@ class Order {
         createdAt: createdAt ?? this.createdAt,
         updatedAt: updatedAt ?? this.updatedAt,
         storeId: storeId ?? this.storeId,
+        promoCodeId: promoCodeId ?? this.promoCodeId,
+        type: type ?? this.type,
       );
 
   int get totalItems => items.fold(0, (sum, item) => sum + item.quantity);

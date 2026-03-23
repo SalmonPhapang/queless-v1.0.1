@@ -1,3 +1,5 @@
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 enum AppEnvironment {
   dev,
   stage,
@@ -5,11 +7,14 @@ enum AppEnvironment {
 }
 
 class AppConfig {
-  static const String _env =
-      String.fromEnvironment('APP_ENV', defaultValue: 'dev');
+  static final String _env =
+      dotenv.env['APP_ENV'] ?? 'dev';
 
-  static const bool enableNotifications =
-      bool.fromEnvironment('ENABLE_NOTIFICATIONS', defaultValue: true);
+  static final bool enableNotifications =
+      dotenv.env['ENABLE_NOTIFICATIONS'] == 'true';
+
+  static const bool kShowDebugMessages =
+      bool.fromEnvironment('SHOW_DEBUG_MESSAGES', defaultValue: true);
 
   static final AppEnvironment environment = _parseEnvironment(_env);
 
@@ -40,13 +45,13 @@ abstract class BaseOzowConfig {
 
 class DevOzowConfig implements BaseOzowConfig {
   @override
-  String get siteCode => 'YOUR_DEV_OZOW_SITE_CODE';
+  String get siteCode => dotenv.env['OZOW_SITE_CODE'] ?? '';
 
   @override
-  String get privateKey => 'YOUR_DEV_OZOW_PRIVATE_KEY';
+  String get privateKey => dotenv.env['OZOW_PRIVATE_KEY'] ?? '';
 
   @override
-  String get apiKey => 'YOUR_DEV_OZOW_API_KEY';
+  String get apiKey => dotenv.env['OZOW_API_KEY'] ?? '';
 
   @override
   String get notifyUrl => 'https://your-dev-backend.com/ozow-notify';
@@ -66,13 +71,13 @@ class DevOzowConfig implements BaseOzowConfig {
 
 class StageOzowConfig implements BaseOzowConfig {
   @override
-  String get siteCode => 'YOUR_STAGE_OZOW_SITE_CODE';
+  String get siteCode => dotenv.env['OZOW_SITE_CODE'] ?? '';
 
   @override
-  String get privateKey => 'YOUR_STAGE_OZOW_PRIVATE_KEY';
+  String get privateKey => dotenv.env['OZOW_PRIVATE_KEY'] ?? '';
 
   @override
-  String get apiKey => 'YOUR_STAGE_OZOW_API_KEY';
+  String get apiKey => dotenv.env['OZOW_API_KEY'] ?? '';
 
   @override
   String get notifyUrl => 'https://your-stage-backend.com/ozow-notify';
@@ -92,13 +97,13 @@ class StageOzowConfig implements BaseOzowConfig {
 
 class ProdOzowConfig implements BaseOzowConfig {
   @override
-  String get siteCode => 'YOUR_PROD_OZOW_SITE_CODE';
+  String get siteCode => dotenv.env['OZOW_SITE_CODE'] ?? '';
 
   @override
-  String get privateKey => 'YOUR_PROD_OZOW_PRIVATE_KEY';
+  String get privateKey => dotenv.env['OZOW_PRIVATE_KEY'] ?? '';
 
   @override
-  String get apiKey => 'YOUR_PROD_OZOW_API_KEY';
+  String get apiKey => dotenv.env['OZOW_API_KEY'] ?? '';
 
   @override
   String get notifyUrl => 'https://your-backend.com/ozow-notify';
@@ -152,10 +157,10 @@ abstract class BasePaystackConfig {
 
 class DevPaystackConfig implements BasePaystackConfig {
   @override
-  String get publicKey => 'pk_test_13b7fedd238b866c32271f51605171de22a8d130';
+  String get publicKey => dotenv.env['PAYSTACK_PUBLIC_KEY'] ?? '';
 
   @override
-  String get secretKey => 'sk_test_0e47146b03295a11ce5e0e9122bad4b8797eacd8';
+  String get secretKey => dotenv.env['PAYSTACK_SECRET_KEY'] ?? '';
 
   @override
   String get currency => 'ZAR';
@@ -169,10 +174,10 @@ class DevPaystackConfig implements BasePaystackConfig {
 
 class StagePaystackConfig implements BasePaystackConfig {
   @override
-  String get publicKey => 'pk_test_13b7fedd238b866c32271f51605171de22a8d130';
+  String get publicKey => dotenv.env['PAYSTACK_PUBLIC_KEY'] ?? '';
 
   @override
-  String get secretKey => 'sk_test_0e47146b03295a11ce5e0e9122bad4b8797eacd8';
+  String get secretKey => dotenv.env['PAYSTACK_SECRET_KEY'] ?? '';
 
   @override
   String get currency => 'ZAR';
@@ -187,10 +192,10 @@ class StagePaystackConfig implements BasePaystackConfig {
 
 class ProdPaystackConfig implements BasePaystackConfig {
   @override
-  String get publicKey => 'YOUR_PROD_PAYSTACK_PUBLIC_KEY';
+  String get publicKey => dotenv.env['PAYSTACK_PUBLIC_KEY'] ?? '';
 
   @override
-  String get secretKey => 'YOUR_PROD_PAYSTACK_SECRET_KEY';
+  String get secretKey => dotenv.env['PAYSTACK_SECRET_KEY'] ?? '';
 
   @override
   String get currency => 'ZAR';

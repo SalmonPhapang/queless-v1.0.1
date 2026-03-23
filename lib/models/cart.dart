@@ -44,6 +44,7 @@ class CartItem {
 
 class Cart {
   final String userId;
+  final String storeId;
   final List<CartItem> items;
   String? promoCode;
   final DateTime createdAt;
@@ -51,6 +52,7 @@ class Cart {
 
   Cart({
     required this.userId,
+    required this.storeId,
     required this.items,
     this.promoCode,
     required this.createdAt,
@@ -62,6 +64,7 @@ class Cart {
 
   Map<String, dynamic> toJson() => {
     'user_id': userId,
+    'store_id': storeId,
     'items': items.map((i) => i.toJson()).toList(),
     'promo_code': promoCode,
     'created_at': createdAt.toIso8601String(),
@@ -70,6 +73,7 @@ class Cart {
 
   factory Cart.fromJson(Map<String, dynamic> json) => Cart(
     userId: json['user_id'] as String,
+    storeId: json['store_id'] as String? ?? '',
     items: (json['items'] as List).map((i) => CartItem.fromJson(i as Map<String, dynamic>)).toList(),
     promoCode: json['promo_code'] as String?,
     createdAt: DateTime.parse(json['created_at'] as String),
@@ -78,12 +82,14 @@ class Cart {
 
   Cart copyWith({
     String? userId,
+    String? storeId,
     List<CartItem>? items,
     String? promoCode,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) => Cart(
     userId: userId ?? this.userId,
+    storeId: storeId ?? this.storeId,
     items: items ?? this.items,
     promoCode: promoCode ?? this.promoCode,
     createdAt: createdAt ?? this.createdAt,

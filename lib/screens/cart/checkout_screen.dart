@@ -14,7 +14,8 @@ import 'package:queless/utils/snack_bar_helper.dart';
 import 'package:queless/utils/compliance_helper.dart';
 
 class CheckoutScreen extends StatefulWidget {
-  const CheckoutScreen({super.key});
+  final String storeId;
+  const CheckoutScreen({super.key, required this.storeId});
 
   @override
   State<CheckoutScreen> createState() => _CheckoutScreenState();
@@ -41,12 +42,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Future<void> _placeOrder() async {
-    final subtotal = _cartService.subtotal;
-    if (subtotal < 100.0) {
+    if (!_cartService.isMinimumOrderMet(widget.storeId)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content:
-                Text('Minimum order amount is R100 excluding delivery fee')),
+        SnackBar(
+            content: Text(
+                'Minimum order amount is ${Formatters.formatCurrency(_cartService.minimumOrderLimit)} excluding delivery fee')),
       );
       return;
     }
@@ -81,9 +81,26 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     try {
       final order = await _orderService.createOrder(
+        storeId: widget.storeId,
         deliveryAddress: _selectedAddress!,
         paymentMethod: _selectedPaymentMethod.displayName,
       );
+
+      if (_selectedPaymentMethod == PaymentMethod.cashOnDelivery) {
+        await _cartService.clear(widget.storeId);
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => OrderTrackingScreen(
+                orderId: order.id,
+                source: OrderTrackingSource.payment,
+              ),
+            ),
+          );
+        }
+        return;
+      }
 
       Payment payment;
       try {
@@ -159,7 +176,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       );
 
       // Clear the cart after successful payment
-      await _cartService.clear();
+      await _cartService.clear(widget.storeId);
 
       if (mounted) {
         Navigator.pushReplacement(
@@ -210,10 +227,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final total = _cartService.calculateTotal();
-    final subtotal = _cartService.subtotal;
-    const minOrderAmount = 100.0;
-    final hasMinimumSubtotal = subtotal >= minOrderAmount;
+    final total = _cartService.calculateTotal(widget.storeId);
+    final subtotal = _cartService.getSubtotal(widget.storeId);
+    final minOrderAmount = _cartService.minimumOrderLimit;
+    final hasMinimumSubtotal = _cartService.isMinimumOrderMet(widget.storeId);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Checkout')),
@@ -291,6 +308,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       secondary: const Icon(Icons.account_balance),
                     ),
                   ),
+                  Card(
+                    child: RadioListTile<PaymentMethod>(
+                      value: PaymentMethod.cashOnDelivery,
+                      groupValue: _selectedPaymentMethod,
+                      onChanged: (value) =>
+                          setState(() => _selectedPaymentMethod = value!),
+                      title: Text(PaymentMethod.cashOnDelivery.displayName),
+                      secondary: const Icon(Icons.money),
+                    ),
+                  ),
                   const SizedBox(height: 32),
                   Container(
                     padding: const EdgeInsets.all(16),
@@ -355,7 +382,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'Minimum order amount is R100 excluding delivery fee',
+                            'Minimum order amount is ${Formatters.formatCurrency(minOrderAmount)} excluding delivery fee',
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: theme.colorScheme.error,
                             ),
@@ -364,6 +391,42 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       ],
                     ),
                   ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Subtotal', style: theme.textTheme.bodyMedium),
+                    Text(Formatters.formatCurrency(subtotal),
+                        style: theme.textTheme.bodyMedium),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Delivery Fee', style: theme.textTheme.bodyMedium),
+                    Text(
+                        Formatters.formatCurrency(
+                            _cartService.getDeliveryFee(widget.storeId)),
+                        style: theme.textTheme.bodyMedium),
+                  ],
+                ),
+                if (_cartService.calculateDiscount(widget.storeId) > 0) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Promo Discount',
+                          style: theme.textTheme.bodyMedium
+                              ?.copyWith(color: theme.colorScheme.secondary)),
+                      Text(
+                          '-${Formatters.formatCurrency(_cartService.calculateDiscount(widget.storeId))}',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.colorScheme.secondary,
+                              fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ],
+                const Divider(height: 24),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -401,7 +464,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 }
 
 class FoodCheckoutScreen extends StatefulWidget {
-  const FoodCheckoutScreen({super.key});
+  final String storeId;
+  const FoodCheckoutScreen({super.key, required this.storeId});
 
   @override
   State<FoodCheckoutScreen> createState() => _FoodCheckoutScreenState();
@@ -430,11 +494,11 @@ class _FoodCheckoutScreenState extends State<FoodCheckoutScreen> {
   }
 
   Future<void> _placeOrder() async {
-    final subtotal = _cartService.subtotal;
-    if (subtotal < 100.0) {
+    if (!_cartService.isMinimumOrderMet(widget.storeId)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Minimum order amount is R100 excluding delivery fee'),
+        SnackBar(
+          content: Text(
+              'Minimum order amount is ${Formatters.formatCurrency(_cartService.minimumOrderLimit)} excluding delivery fee'),
         ),
       );
       return;
@@ -451,9 +515,26 @@ class _FoodCheckoutScreenState extends State<FoodCheckoutScreen> {
 
     try {
       final order = await _orderService.createFoodOrder(
+        storeId: widget.storeId,
         deliveryAddress: _selectedAddress!,
         paymentMethod: _selectedPaymentMethod.displayName,
       );
+
+      if (_selectedPaymentMethod == PaymentMethod.cashOnDelivery) {
+        await _cartService.clear(widget.storeId);
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => OrderTrackingScreen(
+                orderId: order.id,
+                source: OrderTrackingSource.payment,
+              ),
+            ),
+          );
+        }
+        return;
+      }
 
       Payment payment;
       try {
@@ -529,7 +610,7 @@ class _FoodCheckoutScreenState extends State<FoodCheckoutScreen> {
         paymentMethod: _selectedPaymentMethod,
       );
 
-      await _cartService.clear();
+      await _cartService.clear(widget.storeId);
 
       if (mounted) {
         Navigator.pushReplacement(
@@ -583,10 +664,10 @@ class _FoodCheckoutScreenState extends State<FoodCheckoutScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final total = _cartService.calculateTotal();
-    final subtotal = _cartService.subtotal;
-    const minOrderAmount = 100.0;
-    final hasMinimumSubtotal = subtotal >= minOrderAmount;
+    final total = _cartService.calculateTotal(widget.storeId);
+    final subtotal = _cartService.getSubtotal(widget.storeId);
+    final minOrderAmount = _cartService.minimumOrderLimit;
+    final hasMinimumSubtotal = _cartService.isMinimumOrderMet(widget.storeId);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Checkout')),
@@ -677,6 +758,19 @@ class _FoodCheckoutScreenState extends State<FoodCheckoutScreen> {
                       secondary: const Icon(Icons.account_balance),
                     ),
                   ),
+                  Card(
+                    child: RadioListTile<PaymentMethod>(
+                      value: PaymentMethod.cashOnDelivery,
+                      groupValue: _selectedPaymentMethod,
+                      onChanged: (value) => setState(
+                        () => _selectedPaymentMethod = value!,
+                      ),
+                      title: Text(
+                        PaymentMethod.cashOnDelivery.displayName,
+                      ),
+                      secondary: const Icon(Icons.money),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -717,7 +811,7 @@ class _FoodCheckoutScreenState extends State<FoodCheckoutScreen> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'Minimum order amount is R100 excluding delivery fee',
+                            'Minimum order amount is ${Formatters.formatCurrency(minOrderAmount)} excluding delivery fee',
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: theme.colorScheme.error,
                             ),
@@ -726,6 +820,42 @@ class _FoodCheckoutScreenState extends State<FoodCheckoutScreen> {
                       ],
                     ),
                   ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Subtotal', style: theme.textTheme.bodyMedium),
+                    Text(Formatters.formatCurrency(subtotal),
+                        style: theme.textTheme.bodyMedium),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Delivery Fee', style: theme.textTheme.bodyMedium),
+                    Text(
+                        Formatters.formatCurrency(
+                            _cartService.getDeliveryFee(widget.storeId)),
+                        style: theme.textTheme.bodyMedium),
+                  ],
+                ),
+                if (_cartService.calculateDiscount(widget.storeId) > 0) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Promo Discount',
+                          style: theme.textTheme.bodyMedium
+                              ?.copyWith(color: theme.colorScheme.secondary)),
+                      Text(
+                          '-${Formatters.formatCurrency(_cartService.calculateDiscount(widget.storeId))}',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.colorScheme.secondary,
+                              fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ],
+                const Divider(height: 24),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [

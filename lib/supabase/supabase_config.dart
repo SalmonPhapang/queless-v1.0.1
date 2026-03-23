@@ -1,12 +1,13 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 /// Generic Supabase configuration template
 /// Replace YOUR_ and YOUR_ with your actual values
 class SupabaseConfig {
-  static const String supabaseUrl = 'https://lxsvydiyzeavdqbjxkpp.supabase.co';
-  static const String anonKey =
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx4c3Z5ZGl5emVhdmRxYmp4a3BwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc3Njg1MDQsImV4cCI6MjA4MzM0NDUwNH0.nThX1Mj5MlKbsCsmlW8RhukSXC57kcbB9za92LwwiDQ';
+  static final String supabaseUrl = dotenv.env['SUPABASE_URL'] ?? '';
+  static final String anonKey =
+      dotenv.env['SUPABASE_ANON_KEY'] ?? '';
 
   static Future<void> initialize() async {
     await Supabase.initialize(

@@ -4,16 +4,16 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:queless/logger.dart';
 import 'firebase_options.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:queless/theme.dart';
 import 'package:queless/supabase/supabase_config.dart';
 import 'package:queless/services/auth_service.dart';
-import 'package:queless/services/product_service.dart';
 import 'package:queless/services/cart_service.dart';
 import 'package:queless/services/food_cart_service.dart';
-import 'package:queless/services/store_service.dart';
 import 'package:queless/services/order_service.dart';
 import 'package:queless/services/theme_service.dart';
 import 'package:queless/router/auth_router.dart';
@@ -139,12 +139,12 @@ Future<void> _fetchAndSaveFcmTokenWithRetry({
       await messaging.setAutoInitEnabled(true);
       final token = await messaging.getToken();
       if (token != null && token.isNotEmpty) {
-        debugPrint('FCM Token: $token');
+        Logger.debug('FCM Token: $token');
         await _saveFcmToken(token);
       }
       return;
     } catch (e) {
-      debugPrint(
+      Logger.debug(
           '⚠️ Failed to get FCM token (attempt $attempt/$maxAttempts): $e');
       if (attempt == maxAttempts) return;
       final delaySeconds = attempt * attempt;
@@ -167,7 +167,7 @@ Future<void> _saveFcmToken(String token) async {
   final user = AuthService().currentUser;
   if (user != null) {
     try {
-      debugPrint('📝 Saving FCM token for user ${user.id}...');
+      Logger.debug('📝 Saving FCM token for user ${user.id}...');
       final existingRows = await SupabaseService.select(
         'user_fcm_tokens',
         filters: {'user_id': user.id},
@@ -212,12 +212,12 @@ Future<void> _saveFcmToken(String token) async {
           }
         }
       }
-      debugPrint('✅ FCM Token saved to Supabase');
+      Logger.debug('✅ FCM Token saved to Supabase');
     } catch (e) {
-      debugPrint('❌ Failed to save FCM token: $e');
+      Logger.debug('❌ Failed to save FCM token: $e');
     }
   } else {
-    debugPrint('⚠️ User not logged in, skipping FCM token save');
+    Logger.debug('⚠️ User not logged in, skipping FCM token save');
   }
 }
 
@@ -235,14 +235,16 @@ Future<void> _applyFullscreenSystemUi() async {
       ),
     );
   } catch (e) {
-    debugPrint('Failed to apply fullscreen system UI: $e');
+    Logger.debug('Failed to apply fullscreen system UI: $e');
   }
 }
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  debugPrint('🚀 Initializing Queless app...');
+  await dotenv.load(fileName: ".env");
+
+  Logger.debug('🚀 Initializing Queless app...');
 
   await _applyFullscreenSystemUi();
 
@@ -251,24 +253,22 @@ Future<void> main() async {
   );
 
   await SupabaseConfig.initialize();
-  debugPrint('✅ Supabase initialized');
+  Logger.debug('✅ Supabase initialized');
 
   try {
     await DatabaseTest().runAllTests();
   } catch (e) {
-    debugPrint('⚠️  Database test failed: $e');
+    Logger.debug('⚠️  Database test failed: $e');
   }
 
   await AuthService().init();
-  await ProductService().init();
-  await StoreService().init();
   await CartService().init();
   await FoodCartService().init();
   await OrderService().init();
   await ThemeService().init();
 
   if (AppConfig.enableNotifications) {
-    debugPrint('🔔 Initializing Notifications...');
+    Logger.debug('🔔 Initializing Notifications...');
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
     final messaging = FirebaseMessaging.instance;
@@ -289,7 +289,7 @@ Future<void> main() async {
 
     // Listen for token refresh
     messaging.onTokenRefresh.listen((newToken) async {
-      debugPrint('FCM Token Refreshed: $newToken');
+      Logger.debug('FCM Token Refreshed: $newToken');
       await _saveFcmToken(newToken);
     });
 
@@ -330,10 +330,10 @@ Future<void> main() async {
       }
     });
   } else {
-    debugPrint('🔕 Notifications are disabled in this environment');
+    Logger.debug('🔕 Notifications are disabled in this environment');
   }
 
-  debugPrint('✅ All services initialized');
+  Logger.debug('✅ All services initialized');
 
   runApp(const MyApp());
 }

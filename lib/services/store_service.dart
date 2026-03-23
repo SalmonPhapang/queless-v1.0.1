@@ -1,6 +1,7 @@
-import 'package:flutter/foundation.dart';
+import 'package:queless/logger.dart';
+import 'package:queless/utils/logger.dart';
 import 'package:queless/models/store.dart';
-import 'package:queless/services/location_service.dart';
+import 'package:queless/services/cache_service.dart';
 import 'package:queless/supabase/supabase_config.dart';
 
 class StoreService {
@@ -8,47 +9,46 @@ class StoreService {
   factory StoreService() => _instance;
   StoreService._internal();
 
-  List<Store> _cachedStores = [];
+  final _cache = CacheService();
 
-  Future<void> init() async {
-    await _loadStores();
-  }
+  Future<List<Store>> getAllStores() async {
+    const cacheKey = 'all_stores';
+    final cached = _cache.get<List<Store>>(cacheKey);
+    if (cached != null) return cached;
 
-  Future<void> _loadStores() async {
     try {
       final data = await SupabaseService.select(
         'stores',
         orderBy: 'rating',
         ascending: false,
       );
-
-      _cachedStores = data.map((json) => Store.fromJson(json)).toList();
-      debugPrint('✅ Loaded ${_cachedStores.length} stores');
+      final stores = data.map((json) => Store.fromJson(json)).toList();
+      _cache.set(cacheKey, stores);
+      log('✅ Loaded and cached ${stores.length} stores');
+      return stores;
     } catch (e) {
-      debugPrint('❌ Error loading stores: $e');
-      _cachedStores = [];
+      log('❌ Error loading stores: $e');
+      return [];
     }
   }
 
-  Future<List<Store>> getAllStores() async {
-    if (_cachedStores.isEmpty) {
-      await _loadStores();
-    }
-    return List.from(_cachedStores);
-  }
-
-  Future<List<Store>> getOpenStores() async {
+  Future<List<Store>> getOpenStores({String? category}) async {
     try {
+      final Map<String, dynamic> filters = {'is_open': true};
+      if (category != null) {
+        filters['category'] = category;
+      }
+
       final data = await SupabaseService.select(
         'stores',
-        filters: {'is_open': true},
+        filters: filters,
         orderBy: 'rating',
         ascending: false,
       );
 
       return data.map((json) => Store.fromJson(json)).toList();
     } catch (e) {
-      debugPrint('❌ Error getting open stores: $e');
+      log('❌ Error getting open stores: $e');
       return [];
     }
   }
@@ -67,15 +67,23 @@ class StoreService {
   }
 
   Future<Store?> getStoreById(String id) async {
+    final cacheKey = 'store_$id';
+    final cachedStore = _cache.get<Store>(cacheKey);
+    if (cachedStore != null) return cachedStore;
+
     try {
       final data = await SupabaseService.selectSingle(
         'stores',
         filters: {'id': id},
       );
 
-      return data != null ? Store.fromJson(data) : null;
+      final store = data != null ? Store.fromJson(data) : null;
+      if (store != null) {
+        _cache.set(cacheKey, store);
+      }
+      return store;
     } catch (e) {
-      debugPrint('❌ Error getting store by id: $e');
+      log('❌ Error getting store by id: $e');
       return null;
     }
   }
@@ -84,44 +92,56 @@ class StoreService {
     required double latitude,
     required double longitude,
     double radiusMeters = 5000,
+    String? category,
   }) async {
     try {
-      final allStores = await getAllStores();
-      final nearbyStores = <Store>[];
+      final response = await SupabaseConfig.client.rpc(
+        'nearby_stores',
+        params: {
+          'lat': latitude.toDouble(),
+          'long': longitude.toDouble(),
+          'radius_meters': radiusMeters.toDouble(),
+        },
+      );
 
-      for (final store in allStores) {
-        if (store.location.isEmpty) continue;
+      final List<dynamic> data = response as List<dynamic>;
+      var stores = data.map((json) => Store.fromJson(json)).toList();
 
-        try {
-          final parts = store.location.split(',');
-          if (parts.length != 2) continue;
-
-          final storeLat = double.parse(parts[0].trim());
-          final storeLng = double.parse(parts[1].trim());
-
-          final distance = LocationService().calculateDistance(
-            latitude,
-            longitude,
-            storeLat,
-            storeLng,
-          );
-
-          if (distance <= radiusMeters) {
-            nearbyStores.add(store);
-          }
-        } catch (e) {
-          debugPrint(
-              '❌ Error parsing location for store ${store.name} (${store.id}): $e');
-        }
+      if (category != null) {
+        stores = stores.where((s) => s.category == category).toList();
       }
 
-      debugPrint(
-          '✅ Found ${nearbyStores.length} stores within ${radiusMeters}m');
-      return nearbyStores;
+      return stores;
     } catch (e) {
-      debugPrint('❌ Error getting nearby stores: $e');
+      Logger.debug('❌ Error getting nearby stores via RPC: $e');
       return [];
     }
+  }
+
+  Future<Store?> findNearestStore({
+    required double latitude,
+    required double longitude,
+    String category = 'liquor',
+  }) async {
+    // 1. Try 3km radius
+    var stores = await getNearbyStores(
+      latitude: latitude,
+      longitude: longitude,
+      radiusMeters: 3000,
+      category: category,
+    );
+
+    if (stores.isNotEmpty) return stores.first;
+
+    // 2. Try 50km radius
+    stores = await getNearbyStores(
+      latitude: latitude,
+      longitude: longitude,
+      radiusMeters: 50000,
+      category: category,
+    );
+
+    return stores.isNotEmpty ? stores.first : null;
   }
 
   Future<List<Store>> getStoresByCategory(String category) async {
@@ -135,7 +155,7 @@ class StoreService {
 
       return data.map((json) => Store.fromJson(json)).toList();
     } catch (e) {
-      debugPrint('❌ Error getting stores by category: $e');
+      log('❌ Error getting stores by category: $e');
       return [];
     }
   }

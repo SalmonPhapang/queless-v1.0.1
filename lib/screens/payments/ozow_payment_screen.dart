@@ -7,6 +7,8 @@ import 'package:queless/services/cart_service.dart';
 import 'package:queless/services/food_cart_service.dart';
 import 'package:queless/services/payment_service.dart';
 
+import 'package:queless/services/order_service.dart';
+
 class OzowPaymentScreen extends StatelessWidget {
   const OzowPaymentScreen({
     super.key,
@@ -51,10 +53,15 @@ class OzowPaymentScreen extends StatelessWidget {
           if (!context.mounted) return;
 
           if (clearCartOnComplete) {
+            final orderId = payment.orderId;
+            final orderService = OrderService();
+            final order = await orderService.getOrderById(orderId);
+            final storeId = order?.storeId ?? '';
+
             if (isFoodCart) {
-              await FoodCartService().clear();
+              await FoodCartService().clear(storeId);
             } else {
-              await CartService().clear();
+              await CartService().clear(storeId);
             }
           }
 

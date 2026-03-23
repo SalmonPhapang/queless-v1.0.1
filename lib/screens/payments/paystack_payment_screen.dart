@@ -7,6 +7,7 @@ import 'package:queless/services/auth_service.dart';
 import 'package:queless/services/cart_service.dart';
 import 'package:queless/services/food_cart_service.dart';
 import 'package:queless/services/payment_service.dart';
+import 'package:queless/services/order_service.dart';
 
 class PaystackPaymentScreen extends StatefulWidget {
   const PaystackPaymentScreen({
@@ -83,10 +84,15 @@ class _PaystackPaymentScreenState extends State<PaystackPaymentScreen> {
         );
 
         if (widget.clearCartOnComplete) {
+          final orderId = widget.payment.orderId;
+          final orderService = OrderService();
+          final order = await orderService.getOrderById(orderId);
+          final storeId = order?.storeId ?? '';
+
           if (widget.isFoodCart) {
-            await FoodCartService().clear();
+            await FoodCartService().clear(storeId);
           } else {
-            await CartService().clear();
+            await CartService().clear(storeId);
           }
         }
 
@@ -109,10 +115,15 @@ class _PaystackPaymentScreenState extends State<PaystackPaymentScreen> {
         );
 
         if (widget.clearCartOnComplete) {
+          final orderId = widget.payment.orderId;
+          final orderService = OrderService();
+          final order = await orderService.getOrderById(orderId);
+          final storeId = order?.storeId ?? '';
+
           if (widget.isFoodCart) {
-            await FoodCartService().clear();
+            await FoodCartService().clear(storeId);
           } else {
-            await CartService().clear();
+            await CartService().clear(storeId);
           }
         }
 

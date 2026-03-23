@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:queless/screens/auth/login_screen.dart';
 import 'package:queless/screens/auth/signup_screen.dart';
 import 'package:queless/services/auth_service.dart';
+import 'package:queless/services/food_cart_service.dart';
 import 'package:queless/services/cart_service.dart';
 
 class WelcomeScreen extends StatefulWidget {
@@ -18,20 +19,21 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   Future<void> _clearAllData() async {
     try {
       debugPrint('🗑️  Clearing all app data for testing...');
-      
+
       // Clear SharedPreferences
       final prefs = await SharedPreferences.getInstance();
       await prefs.clear();
       debugPrint('✅ SharedPreferences cleared');
-      
-      // Clear cart
+
+      // Clear carts
       await CartService().clearCart();
-      debugPrint('✅ Cart cleared');
-      
+      await FoodCartService().clearCart();
+      debugPrint('✅ Carts cleared');
+
       // Sign out
       await AuthService().signOut();
       debugPrint('✅ User signed out');
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -53,7 +55,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
+
     return Scaffold(
       body: SafeArea(
         child: Padding(
@@ -69,7 +71,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                     _clearAllData();
                   }
                 },
-                child: Icon(Icons.local_bar, size: 80, color: theme.colorScheme.primary),
+                child: Icon(Icons.local_bar,
+                    size: 80, color: theme.colorScheme.primary),
               ),
               const SizedBox(height: 24),
               Text(
@@ -99,7 +102,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SignupScreen())),
+                  onPressed: () => Navigator.push(context,
+                      MaterialPageRoute(builder: (_) => const SignupScreen())),
                   child: const Text('Create Account'),
                 ),
               ),
@@ -107,7 +111,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton(
-                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const LoginScreen())),
+                  onPressed: () => Navigator.push(context,
+                      MaterialPageRoute(builder: (_) => const LoginScreen())),
                   child: const Text('Sign In'),
                 ),
               ),

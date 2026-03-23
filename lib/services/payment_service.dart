@@ -183,7 +183,11 @@ class PaymentService {
               'Authorization': 'Bearer ${SupabaseConfig.anonKey}',
               'apikey': SupabaseConfig.anonKey,
             },
-            body: {'order_id': payment.orderId, 'store_id': order?.storeId},
+            body: {
+              'order_id': payment.orderId,
+              'store_id': order?.storeId,
+              'order_type': order?.orderType,
+            },
           );
         } catch (e) {
           debugPrint('Error invoking new-order-notify: $e');
