@@ -55,25 +55,16 @@ class _CategoryScreenState extends State<CategoryScreen> {
       category: 'liquor',
     );
 
-    if (store != null && store.location.isNotEmpty) {
-      final parts = store.location.split(',');
-      if (parts.length == 2) {
-        final storeLat = double.parse(parts[0].trim());
-        final storeLng = double.parse(parts[1].trim());
-        final distance = _locationService.calculateDistance(
-          position.latitude,
-          position.longitude,
-          storeLat,
-          storeLng,
-        );
+    if (store != null) {
+      final distanceKm = (store.distance ?? 0) / 1000;
 
-        final distanceKm = distance / 1000;
+      setState(() {
+        _nearestStore = store;
+        _distanceToStore = distanceKm;
+      });
 
-        setState(() {
-          _nearestStore = store;
-          _distanceToStore = distanceKm;
-        });
-      }
+      // Update distance in cart service for fee calculation
+      _cartService.updateStoreDistance(store.id, store.distance ?? 0);
     }
   }
 

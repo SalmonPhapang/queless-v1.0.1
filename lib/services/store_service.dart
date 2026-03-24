@@ -32,9 +32,9 @@ class StoreService {
     }
   }
 
-  Future<List<Store>> getOpenStores({String? category}) async {
+  Future<List<Store>> getStores({String? category}) async {
     try {
-      final Map<String, dynamic> filters = {'is_open': true};
+      final Map<String, dynamic> filters = {};
       if (category != null) {
         filters['category'] = category;
       }
@@ -48,7 +48,7 @@ class StoreService {
 
       return data.map((json) => Store.fromJson(json)).toList();
     } catch (e) {
-      log('❌ Error getting open stores: $e');
+      log('❌ Error getting stores: $e');
       return [];
     }
   }
@@ -105,7 +105,15 @@ class StoreService {
       );
 
       final List<dynamic> data = response as List<dynamic>;
-      var stores = data.map((json) => Store.fromJson(json)).toList();
+      var stores = data.map((json) {
+        // Ensure distance is captured if returned by RPC
+        final store = Store.fromJson(json);
+        if (json.containsKey('dist_meters')) {
+          return store.copyWith(
+              distance: (json['dist_meters'] as num).toDouble());
+        }
+        return store;
+      }).toList();
 
       if (category != null) {
         stores = stores.where((s) => s.category == category).toList();
@@ -124,11 +132,21 @@ class StoreService {
     String category = 'liquor',
     double radiusMeters = 5000,
   }) async {
-    // Try to find a store within the specified radius
-    final stores = await getNearbyStores(
+    // 1. Try 5km radius
+    var stores = await getNearbyStores(
       latitude: latitude,
       longitude: longitude,
       radiusMeters: radiusMeters,
+      category: category,
+    );
+
+    if (stores.isNotEmpty) return stores.first;
+
+    // 2. Try 10km radius if no stores within 5km
+    stores = await getNearbyStores(
+      latitude: latitude,
+      longitude: longitude,
+      radiusMeters: 10000,
       category: category,
     );
 

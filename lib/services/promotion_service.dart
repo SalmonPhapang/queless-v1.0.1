@@ -63,7 +63,7 @@ class PromotionService extends ChangeNotifier {
     return _activePromotions.any(
       (p) =>
           p.targetType == PromotionTargetType.product &&
-          p.targetId == productId,
+          p.targetIds.contains(productId),
     );
   }
 
@@ -76,7 +76,7 @@ class PromotionService extends ChangeNotifier {
   Promotion? promotionForProduct(String productId) {
     for (final promo in _activePromotions) {
       if (promo.targetType == PromotionTargetType.product &&
-          promo.targetId == productId) {
+          promo.targetIds.contains(productId)) {
         return promo;
       }
     }

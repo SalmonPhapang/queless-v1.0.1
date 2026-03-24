@@ -4,6 +4,7 @@ import 'package:queless/models/store.dart';
 import 'package:queless/services/store_service.dart';
 import 'package:queless/services/auth_service.dart';
 import 'package:queless/services/location_service.dart';
+import 'package:queless/services/food_cart_service.dart';
 import 'package:queless/screens/auth/permission_request_screen.dart';
 import 'package:queless/screens/home/store_card.dart';
 import 'package:queless/screens/food/store_detail_screen.dart';
@@ -100,10 +101,30 @@ class _FoodHomeScreenState extends State<FoodHomeScreen> {
           category: 'restaurant',
         );
 
-        setState(() {
-          _stores = stores;
-          _isLoading = false;
-        });
+        var finalStores = stores;
+        if (stores.isEmpty) {
+          // Try 10km radius if no stores within 5km
+          finalStores = await _storeService.getNearbyStores(
+            latitude: position.latitude,
+            longitude: position.longitude,
+            radiusMeters: 10000, // 10km radius
+            category: 'restaurant',
+          );
+        }
+
+        if (mounted) {
+          setState(() {
+            _stores = finalStores;
+            _isLoading = false;
+          });
+
+          // Update distances in food cart service for fee calculation
+          for (final store in finalStores) {
+            if (store.distance != null) {
+              FoodCartService().updateStoreDistance(store.id, store.distance!);
+            }
+          }
+        }
         await _promotionService.refreshActivePromotions();
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted) return;
@@ -111,10 +132,8 @@ class _FoodHomeScreenState extends State<FoodHomeScreen> {
         });
       } else {
         // Fallback to all open food stores if location denied/unavailable
-        debugPrint(
-            '⚠️ Location unavailable, falling back to all open food stores');
-        final stores =
-            await _storeService.getOpenStores(category: 'restaurant');
+        debugPrint('⚠️ Location unavailable, falling back to all food stores');
+        final stores = await _storeService.getStores(category: 'restaurant');
         setState(() {
           _stores = stores;
           _isLoading = false;
@@ -304,6 +323,68 @@ class _FoodHomeScreenState extends State<FoodHomeScreen> {
                       ],
                     ),
                     const SizedBox(height: 16),
+                    if (_stores.isNotEmpty &&
+                        _stores.every((s) => (s.distance ?? 0) > 5000))
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.secondaryContainer
+                              .withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: theme.colorScheme.secondary
+                                .withValues(alpha: 0.1),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.info_outline_rounded,
+                                color: theme.colorScheme.secondary),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'No stores within 5km. Showing nearby options within 10km. Delivery fee: R45.',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: theme.colorScheme.secondary,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    if (_stores.isNotEmpty &&
+                        _stores.every((s) => (s.distance ?? 0) > 5000))
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.secondaryContainer
+                              .withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: theme.colorScheme.secondary
+                                .withValues(alpha: 0.1),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.info_outline_rounded,
+                                color: theme.colorScheme.secondary),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'No stores within 5km. Showing nearby options within 10km. Delivery fee: R45.',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: theme.colorScheme.secondary,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     _getFilteredStores().isEmpty
                         ? Center(
                             child: Padding(
@@ -330,12 +411,14 @@ class _FoodHomeScreenState extends State<FoodHomeScreen> {
                               ),
                             ),
                           )
-                        : ListView.builder(
+                        : ListView.separated(
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
                             itemCount: _getFilteredStores().length,
                             itemBuilder: (context, index) =>
                                 StoreCard(store: _getFilteredStores()[index]),
+                            separatorBuilder: (context, index) =>
+                                const SizedBox(height: 16),
                           ),
                   ],
                 ),

@@ -21,6 +21,9 @@ class Store {
   final DateTime updatedAt;
 
   final String? nextOpeningTime; // e.g. "Tomorrow at 9am"
+  final double? distance; // distance in meters, only set when searching nearby
+
+  final bool isApproved;
 
   Store({
     required this.id,
@@ -44,6 +47,8 @@ class Store {
     required this.createdAt,
     required this.updatedAt,
     this.nextOpeningTime,
+    this.distance,
+    this.isApproved = true,
   });
 
   Map<String, dynamic> toJson() => {
@@ -68,6 +73,8 @@ class Store {
         'created_at': createdAt.toIso8601String(),
         'updated_at': updatedAt.toIso8601String(),
         'next_opening_time': nextOpeningTime,
+        'distance': distance,
+        'is_approved': isApproved,
       };
 
   factory Store.fromJson(Map<String, dynamic> json) => Store(
@@ -95,6 +102,8 @@ class Store {
         createdAt: DateTime.parse(json['created_at'] as String),
         updatedAt: DateTime.parse(json['updated_at'] as String),
         nextOpeningTime: json['next_opening_time'] as String?,
+        distance: (json['distance'] as num?)?.toDouble(),
+        isApproved: json['is_approved'] as bool? ?? true,
       );
 
   Store copyWith({
@@ -119,6 +128,8 @@ class Store {
     DateTime? createdAt,
     DateTime? updatedAt,
     String? nextOpeningTime,
+    double? distance,
+    bool? isApproved,
   }) {
     return Store(
       id: id ?? this.id,
@@ -142,6 +153,8 @@ class Store {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       nextOpeningTime: nextOpeningTime ?? this.nextOpeningTime,
+      distance: distance ?? this.distance,
+      isApproved: isApproved ?? this.isApproved,
     );
   }
 }

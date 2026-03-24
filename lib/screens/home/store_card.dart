@@ -24,6 +24,16 @@ class StoreCard extends StatelessWidget {
       elevation: 2,
       child: InkWell(
         onTap: () {
+          if (!store.isApproved) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('${store.name} is coming soon!'),
+                backgroundColor: Colors.orange,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+            return;
+          }
           if (store.category == 'food') {
             Navigator.push(
               context,
@@ -125,30 +135,59 @@ class StoreCard extends StatelessWidget {
                         left: 12,
                         child: PromoBadge(text: promo.badgeText),
                       ),
-                    if (!store.isOpen)
+                    if (!store.isApproved)
                       Positioned.fill(
                         child: Container(
                           decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.4),
+                            color: Colors.black.withOpacity(0.5),
                             borderRadius: const BorderRadius.vertical(
                               top: Radius.circular(16),
                             ),
                           ),
-                          child: Center(
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: theme.colorScheme.error,
-                                borderRadius: BorderRadius.circular(8),
+                          child: const Center(
+                            child: Text(
+                              'COMING SOON',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 22,
+                                letterSpacing: 1.2,
+                                shadows: [
+                                  Shadow(
+                                    blurRadius: 4.0,
+                                    color: Colors.black54,
+                                    offset: Offset(1, 1),
+                                  ),
+                                ],
                               ),
-                              child: Text(
-                                'CLOSED',
-                                style: theme.textTheme.titleSmall?.copyWith(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 1.2,
-                                ),
+                            ),
+                          ),
+                        ),
+                      )
+                    else if (!store.isOpen)
+                      Positioned.fill(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.5),
+                            borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(16),
+                            ),
+                          ),
+                          child: const Center(
+                            child: Text(
+                              'CLOSED',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 22,
+                                letterSpacing: 1.2,
+                                shadows: [
+                                  Shadow(
+                                    blurRadius: 4.0,
+                                    color: Colors.black54,
+                                    offset: Offset(1, 1),
+                                  ),
+                                ],
                               ),
                             ),
                           ),
@@ -171,7 +210,7 @@ class StoreCard extends StatelessWidget {
                           store.name,
                           style: theme.textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.bold,
-                            color: store.isOpen
+                            color: store.isOpen && store.isApproved
                                 ? theme.colorScheme.onSurface
                                 : theme.colorScheme.onSurface
                                     .withValues(alpha: 0.6),
@@ -180,7 +219,7 @@ class StoreCard extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      if (store.rating > 0)
+                      if (store.rating > 0 && store.isApproved)
                         Row(
                           children: [
                             const Icon(Icons.star,
@@ -196,7 +235,16 @@ class StoreCard extends StatelessWidget {
                         ),
                     ],
                   ),
-                  if (!store.isOpen) ...[
+                  if (!store.isApproved) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Launching soon in your area!',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: Colors.orange,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ] else if (!store.isOpen) ...[
                     const SizedBox(height: 4),
                     Text(
                       store.nextOpeningTime ?? 'Will open soon',
@@ -229,7 +277,20 @@ class StoreCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ],
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 4),
+                  if (store.distance != null)
+                    Text(
+                      '${(store.distance! / 1000).toStringAsFixed(1)}km away • Delivery: R${store.distance! > 5000 ? "45" : "25"}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: store.distance! > 5000
+                            ? theme.colorScheme.secondary
+                            : theme.colorScheme.outline,
+                        fontWeight: store.distance! > 5000
+                            ? FontWeight.bold
+                            : FontWeight.normal,
+                      ),
+                    ),
+                  const SizedBox(height: 8),
                   Row(
                     children: [
                       Icon(Icons.delivery_dining,

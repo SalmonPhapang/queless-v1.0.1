@@ -58,13 +58,27 @@ class _HomeScreenState extends State<HomeScreen> {
     final position = await _locationService.getCurrentLocation();
     if (position == null) return;
 
-    // Fetch liquor stores within 5km
-    final stores = await _storeService.getNearbyStores(
+    // 1. Try 5km radius
+    var stores = await _storeService.getNearbyStores(
       latitude: position.latitude,
       longitude: position.longitude,
       radiusMeters: 5000,
       category: 'liquor',
     );
+
+    bool isExtendedRange = false;
+    if (stores.isEmpty) {
+      // 2. Try 10km radius
+      stores = await _storeService.getNearbyStores(
+        latitude: position.latitude,
+        longitude: position.longitude,
+        radiusMeters: 10000,
+        category: 'liquor',
+      );
+      if (stores.isNotEmpty) {
+        isExtendedRange = true;
+      }
+    }
 
     final address = await _locationService.getAddressFromCoordinates(
         position.latitude, position.longitude);
@@ -73,9 +87,19 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _nearbyStores = stores;
         _userAddress = address;
+        _isExtendedRange = isExtendedRange;
       });
+
+      // Update distances in cart service for fee calculation
+      for (final store in stores) {
+        if (store.distance != null) {
+          _cartService.updateStoreDistance(store.id, store.distance!);
+        }
+      }
     }
   }
+
+  bool _isExtendedRange = false;
 
   Future<void> _loadOrdersAndPromotions() async {
     setState(() => _isLoading = true);
@@ -119,13 +143,13 @@ class _HomeScreenState extends State<HomeScreen> {
           if (!rootContext.mounted) return;
 
           if (promo.targetType == PromotionTargetType.product) {
-            final product =
-                await _productService.getProductById(promo.targetId);
-            if (!rootContext.mounted || product == null) return;
             await Navigator.push(
               rootContext,
               MaterialPageRoute(
-                builder: (_) => ProductDetailScreen(product: product),
+                builder: (_) => BrowseScreen(
+                  productIds: promo.targetIds,
+                  title: promo.title,
+                ),
               ),
             );
             if (!rootContext.mounted) return;
@@ -482,6 +506,37 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                     const SizedBox(height: 24),
                     const ResponsibleDrinkingBanner(),
+                    if (_isExtendedRange) ...[
+                      const SizedBox(height: 24),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.secondaryContainer
+                              .withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: theme.colorScheme.secondary
+                                .withValues(alpha: 0.1),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.info_outline_rounded,
+                                color: theme.colorScheme.secondary),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'No stores within 5km. Showing nearby options within 10km. Delivery fee: R45.',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: theme.colorScheme.secondary,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     if (_nearbyStores.isNotEmpty) ...[
                       const SizedBox(height: 32),
                       Text('Liquor Stores',
@@ -494,8 +549,10 @@ class _HomeScreenState extends State<HomeScreen> {
                         itemCount: _nearbyStores.length,
                         separatorBuilder: (context, index) =>
                             const SizedBox(height: 16),
-                        itemBuilder: (context, index) =>
-                            StoreCard(store: _nearbyStores[index]),
+                        itemBuilder: (context, index) {
+                          final store = _nearbyStores[index];
+                          return StoreCard(store: store);
+                        },
                       ),
                     ] else if (!_isLoading) ...[
                       const SizedBox(height: 24),

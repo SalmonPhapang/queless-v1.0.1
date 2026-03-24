@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:queless/models/product.dart';
 import 'package:queless/models/store.dart';
+import 'package:queless/services/food_cart_service.dart';
 import 'package:queless/services/product_service.dart';
 import 'package:queless/services/cart_service.dart';
 import 'package:queless/services/location_service.dart';
+import 'package:queless/services/promotion_service.dart';
+import 'package:queless/widgets/promo_badge.dart';
 import 'package:queless/utils/formatters.dart';
 import 'package:queless/screens/cart/cart_screen.dart';
 import 'package:queless/screens/product/product_detail_screen.dart';
@@ -28,30 +31,7 @@ class _StoreProductsScreenState extends State<StoreProductsScreen> {
   double? _distance;
   ProductCategory? _selectedCategory;
 
-  final List<Map<String, dynamic>> _categories = [
-    {'name': 'All', 'category': null, 'icon': Icons.all_inclusive},
-    {
-      'name': 'Beer',
-      'category': ProductCategory.beer,
-      'icon': Icons.sports_bar
-    },
-    {'name': 'Wine', 'category': ProductCategory.wine, 'icon': Icons.wine_bar},
-    {
-      'name': 'Spirits',
-      'category': ProductCategory.spirits,
-      'icon': Icons.local_bar
-    },
-    {
-      'name': 'Mixers',
-      'category': ProductCategory.mixers,
-      'icon': Icons.local_drink
-    },
-    {
-      'name': 'Snacks',
-      'category': ProductCategory.snacks,
-      'icon': Icons.fastfood
-    },
-  ];
+  List<Map<String, dynamic>> _categories = [];
 
   @override
   void initState() {
@@ -62,6 +42,7 @@ class _StoreProductsScreenState extends State<StoreProductsScreen> {
   Future<void> _initData() async {
     await _updateCartStoreInfo();
     await _loadProducts();
+    await PromotionService().refreshActivePromotions();
   }
 
   Future<void> _updateCartStoreInfo() async {
@@ -78,6 +59,13 @@ class _StoreProductsScreenState extends State<StoreProductsScreen> {
           storeLng,
         );
         setState(() => _distance = distance / 1000);
+
+        // Update distance in cart services for fee calculation
+        if (widget.store.category == 'food') {
+          FoodCartService().updateStoreDistance(widget.store.id, distance);
+        } else {
+          CartService().updateStoreDistance(widget.store.id, distance);
+        }
       }
     }
   }
@@ -93,6 +81,7 @@ class _StoreProductsScreenState extends State<StoreProductsScreen> {
           _filteredProducts = products;
           _isLoading = false;
         });
+        _generateCategoriesFromProducts();
       }
     } catch (e) {
       debugPrint('Error loading products for store: $e');
@@ -111,6 +100,53 @@ class _StoreProductsScreenState extends State<StoreProductsScreen> {
         _filteredProducts =
             _allProducts.where((p) => p.category == category).toList();
       }
+    });
+  }
+
+  void _generateCategoriesFromProducts() {
+    if (_allProducts.isEmpty) return;
+
+    final categories = <ProductCategory>{};
+    for (var product in _allProducts) {
+      categories.add(product.category);
+    }
+
+    final categoryList = categories.map<Map<String, dynamic>>((category) {
+      String name;
+      IconData icon;
+      switch (category) {
+        case ProductCategory.beer:
+          name = 'Beer';
+          icon = Icons.sports_bar;
+          break;
+        case ProductCategory.wine:
+          name = 'Wine';
+          icon = Icons.wine_bar;
+          break;
+        case ProductCategory.spirits:
+          name = 'Spirits';
+          icon = Icons.local_bar;
+          break;
+        case ProductCategory.mixers:
+          name = 'Mixers';
+          icon = Icons.local_drink;
+          break;
+        case ProductCategory.snacks:
+          name = 'Snacks';
+          icon = Icons.fastfood;
+          break;
+        default:
+          name = 'Other';
+          icon = Icons.category;
+      }
+      return {'name': name, 'category': category, 'icon': icon};
+    }).toList();
+
+    categoryList.insert(
+        0, {'name': 'All', 'category': null, 'icon': Icons.all_inclusive});
+
+    setState(() {
+      _categories = categoryList;
     });
   }
 
@@ -246,6 +282,23 @@ class _ProductCard extends StatelessWidget {
                                 child: Icon(Icons.local_bar, size: 48)),
                           )
                         : const Center(child: Icon(Icons.local_bar, size: 48)),
+                  ),
+                  AnimatedBuilder(
+                    animation: PromotionService(),
+                    builder: (context, _) {
+                      final promo =
+                          PromotionService().promotionForProduct(product.id);
+                      if (promo == null) return const SizedBox.shrink();
+                      return Positioned(
+                        top: 8,
+                        left: 8,
+                        child: Transform.scale(
+                          scale: 0.8,
+                          alignment: Alignment.topLeft,
+                          child: PromoBadge(text: promo.badgeText),
+                        ),
+                      );
+                    },
                   ),
                   if (product.isLocalBrand)
                     Positioned(

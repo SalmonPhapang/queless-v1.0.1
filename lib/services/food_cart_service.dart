@@ -9,7 +9,8 @@ import 'package:queless/services/promo_code_service.dart';
 
 class FoodCartService extends ChangeNotifier {
   static const String _cartKey = 'food_cart_data_multi';
-  static const double _fixedDeliveryFee = 25.0;
+  static const double _baseDeliveryFee = 25.0;
+  static const double _extendedDeliveryFee = 45.0;
   static const double _foodMinimumOrder = 65.0;
 
   static final FoodCartService _instance = FoodCartService._internal();
@@ -20,6 +21,7 @@ class FoodCartService extends ChangeNotifier {
   Map<String, Cart> _carts = {};
   bool _isInitialized = false;
   Map<String, PromoCode?> _appliedPromos = {};
+  Map<String, double> _storeDistances = {};
 
   Map<String, Cart> get carts => _carts;
   int get totalItemCount =>
@@ -32,7 +34,15 @@ class FoodCartService extends ChangeNotifier {
   double getDeliveryFee(String storeId) {
     final promo = _appliedPromos[storeId];
     final hasFreeDelivery = promo?.discountType == DiscountType.freeDelivery;
-    return hasFreeDelivery ? 0.0 : _fixedDeliveryFee;
+    if (hasFreeDelivery) return 0.0;
+
+    final distance = _storeDistances[storeId] ?? 0.0;
+    return distance > 5000 ? _extendedDeliveryFee : _baseDeliveryFee;
+  }
+
+  void updateStoreDistance(String storeId, double distanceMeters) {
+    _storeDistances[storeId] = distanceMeters;
+    notifyListeners();
   }
 
   double get minimumOrderLimit => _foodMinimumOrder;

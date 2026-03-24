@@ -3,6 +3,7 @@ import 'package:queless/models/store.dart';
 import 'package:queless/models/product.dart';
 import 'package:queless/services/product_service.dart';
 import 'package:queless/services/food_cart_service.dart';
+import 'package:queless/services/location_service.dart';
 import 'package:queless/utils/snack_bar_helper.dart';
 import 'package:queless/services/promotion_service.dart';
 import 'package:queless/screens/cart/cart_screen.dart';
@@ -21,13 +22,16 @@ class StoreDetailScreen extends StatefulWidget {
 class _StoreDetailScreenState extends State<StoreDetailScreen> {
   final _productService = ProductService();
   final _cartService = FoodCartService();
+  final _locationService = LocationService();
   List<Product> _products = [];
   bool _isLoading = true;
+  double? _distance;
 
   @override
   void initState() {
     super.initState();
     _loadProducts();
+    _updateDistance();
   }
 
   Future<void> _loadProducts() async {
@@ -41,6 +45,29 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
       });
     } catch (e) {
       setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _updateDistance() async {
+    final position = await _locationService.getCurrentLocation();
+    if (position != null && widget.store.location.isNotEmpty) {
+      final parts = widget.store.location.split(',');
+      if (parts.length == 2) {
+        final storeLat = double.parse(parts[0].trim());
+        final storeLng = double.parse(parts[1].trim());
+        final distance = _locationService.calculateDistance(
+          position.latitude,
+          position.longitude,
+          storeLat,
+          storeLng,
+        );
+        if (mounted) {
+          setState(() => _distance = distance / 1000);
+        }
+
+        // Update distance in food cart service for fee calculation
+        FoodCartService().updateStoreDistance(widget.store.id, distance);
+      }
     }
   }
 

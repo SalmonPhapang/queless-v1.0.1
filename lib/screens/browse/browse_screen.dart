@@ -13,10 +13,14 @@ import 'package:queless/widgets/promo_badge.dart';
 
 class BrowseScreen extends StatefulWidget {
   final ProductType productType;
+  final List<String>? productIds;
+  final String? title;
 
   const BrowseScreen({
     super.key,
     this.productType = ProductType.alcohol,
+    this.productIds,
+    this.title,
   });
 
   @override
@@ -66,27 +70,18 @@ class _BrowseScreenState extends State<BrowseScreen> {
       category: 'liquor',
     );
 
-    if (store != null && store.location.isNotEmpty) {
-      final parts = store.location.split(',');
-      if (parts.length == 2) {
-        final storeLat = double.parse(parts[0].trim());
-        final storeLng = double.parse(parts[1].trim());
-        final distance = _locationService.calculateDistance(
-          position.latitude,
-          position.longitude,
-          storeLat,
-          storeLng,
-        );
+    if (store != null) {
+      final distanceKm = (store.distance ?? 0) / 1000;
 
-        final distanceKm = distance / 1000;
+      setState(() {
+        _nearestStore = store;
+        _distanceToStore = distanceKm;
+      });
 
-        setState(() {
-          _nearestStore = store;
-          _distanceToStore = distanceKm;
-        });
-      }
+      // Update distance in cart service for fee calculation
+      _cartService.updateStoreDistance(store.id, store.distance ?? 0);
     } else {
-      // No store found within 5km
+      // No store found within 10km
       setState(() {
         _nearestStore = null;
         _distanceToStore = null;
@@ -105,7 +100,11 @@ class _BrowseScreenState extends State<BrowseScreen> {
     try {
       List<Product> productsToLoad;
 
-      if (widget.productType == ProductType.alcohol && _nearestStore != null) {
+      if (widget.productIds != null && widget.productIds!.isNotEmpty) {
+        productsToLoad =
+            await _productService.getProductsByIds(widget.productIds!);
+      } else if (widget.productType == ProductType.alcohol &&
+          _nearestStore != null) {
         debugPrint(
             '🔍 BrowseScreen: Fetching products for store ${_nearestStore!.id}');
         // Load products specifically for this store
@@ -161,7 +160,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Browse Products')),
+      appBar: AppBar(title: Text(widget.title ?? 'Browse Products')),
       body: Column(
         children: [
           if (widget.productType == ProductType.alcohol &&

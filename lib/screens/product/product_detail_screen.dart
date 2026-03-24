@@ -236,6 +236,55 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             style: theme.textTheme.headlineMedium?.copyWith(
                                 color: theme.colorScheme.primary,
                                 fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 12),
+                        AnimatedBuilder(
+                          animation: PromotionService(),
+                          builder: (context, _) {
+                            final promo = PromotionService()
+                                .promotionForProduct(widget.product.id);
+                            if (promo == null) return const SizedBox.shrink();
+                            return Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.secondaryContainer
+                                    .withValues(alpha: 0.3),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: theme.colorScheme.secondary
+                                      .withValues(alpha: 0.1),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.stars,
+                                      color: theme.colorScheme.secondary,
+                                      size: 20),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          promo.title,
+                                          style: theme.textTheme.titleSmall
+                                              ?.copyWith(
+                                            color: theme.colorScheme.secondary,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        Text(
+                                          promo.message,
+                                          style: theme.textTheme.bodySmall,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
                         const SizedBox(height: 24),
                         if (widget.product.volume != null ||
                             widget.product.alcoholContent != null)

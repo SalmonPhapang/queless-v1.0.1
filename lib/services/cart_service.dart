@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:queless/services/store_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:queless/models/cart.dart';
 import 'package:queless/models/product.dart';
@@ -10,7 +11,8 @@ import 'package:queless/services/promo_code_service.dart';
 
 class CartService extends ChangeNotifier {
   static const String _cartKey = 'cart_data_multi';
-  static const double _fixedDeliveryFee = 25.0;
+  static const double _baseDeliveryFee = 25.0;
+  static const double _extendedDeliveryFee = 45.0;
   static const double _alcoholMinimumOrder = 100.0;
 
   static final CartService _instance = CartService._internal();
@@ -18,9 +20,11 @@ class CartService extends ChangeNotifier {
   CartService._internal();
 
   final _promoCodeService = PromoCodeService();
+  final _storeService = StoreService();
   Map<String, Cart> _carts = {};
   bool _isInitialized = false;
   Map<String, PromoCode?> _appliedPromos = {};
+  Map<String, double> _storeDistances = {};
 
   Map<String, Cart> get carts => _carts;
   int get totalItemCount =>
@@ -33,7 +37,15 @@ class CartService extends ChangeNotifier {
   double getDeliveryFee(String storeId) {
     final promo = _appliedPromos[storeId];
     final hasFreeDelivery = promo?.discountType == DiscountType.freeDelivery;
-    return hasFreeDelivery ? 0.0 : _fixedDeliveryFee;
+    if (hasFreeDelivery) return 0.0;
+
+    final distance = _storeDistances[storeId] ?? 0.0;
+    return distance > 5000 ? _extendedDeliveryFee : _baseDeliveryFee;
+  }
+
+  void updateStoreDistance(String storeId, double distanceMeters) {
+    _storeDistances[storeId] = distanceMeters;
+    notifyListeners();
   }
 
   double get minimumOrderLimit => _alcoholMinimumOrder;
