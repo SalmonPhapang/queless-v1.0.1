@@ -135,6 +135,38 @@ class _StoreProductsScreenState extends State<StoreProductsScreen> {
           name = 'Snacks';
           icon = Icons.fastfood;
           break;
+        case ProductCategory.food:
+          name = 'Food';
+          icon = Icons.restaurant;
+          break;
+        case ProductCategory.burgers:
+          name = 'Burgers';
+          icon = Icons.lunch_dining;
+          break;
+        case ProductCategory.pizza:
+          name = 'Pizza';
+          icon = Icons.local_pizza;
+          break;
+        case ProductCategory.chicken:
+          name = 'Chicken';
+          icon = Icons.restaurant;
+          break;
+        case ProductCategory.asian:
+          name = 'Asian';
+          icon = Icons.ramen_dining;
+          break;
+        case ProductCategory.desserts:
+          name = 'Desserts';
+          icon = Icons.cake;
+          break;
+        case ProductCategory.drinks:
+          name = 'Drinks';
+          icon = Icons.local_drink;
+          break;
+        case ProductCategory.groceries:
+          name = 'Groceries';
+          icon = Icons.shopping_basket;
+          break;
         default:
           name = 'Other';
           icon = Icons.category;
@@ -364,7 +396,7 @@ class _ProductCard extends StatelessWidget {
               child: SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: store.isOpen
+                  onPressed: store.isOpen && product.isInStock
                       ? () async {
                           await cartService.addItem(product);
                           if (context.mounted) {
@@ -377,11 +409,16 @@ class _ProductCard extends StatelessWidget {
                     minimumSize: const Size(0, 32),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8)),
-                    backgroundColor:
-                        store.isOpen ? null : theme.colorScheme.surfaceVariant,
+                    backgroundColor: store.isOpen && product.isInStock
+                        ? null
+                        : theme.colorScheme.surfaceVariant,
                   ),
                   child: Text(
-                    store.isOpen ? 'Add to Cart' : 'Offline',
+                    !product.isInStock
+                        ? 'Out of Stock'
+                        : store.isOpen
+                            ? 'Add to Cart'
+                            : 'Offline',
                     style: const TextStyle(fontSize: 12),
                   ),
                 ),
@@ -400,8 +437,9 @@ class _ProductCard extends StatelessWidget {
         content: const Text('Added to Alcohol Cart'),
         backgroundColor: theme.colorScheme.secondary,
         behavior: SnackBarBehavior.floating,
-        width: 280,
         duration: const Duration(seconds: 4),
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         action: SnackBarAction(
           label: 'View Cart',
           textColor: Colors.white,

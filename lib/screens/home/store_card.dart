@@ -34,7 +34,7 @@ class StoreCard extends StatelessWidget {
             );
             return;
           }
-          if (store.category == 'food') {
+          if (store.category == 'food' || store.category == 'restaurant') {
             Navigator.push(
               context,
               MaterialPageRoute(

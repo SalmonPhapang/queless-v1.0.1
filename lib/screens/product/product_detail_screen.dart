@@ -74,8 +74,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 Text(isFood ? 'Added to Food Cart' : 'Added to Alcohol Cart'),
             backgroundColor: theme.colorScheme.secondary,
             behavior: SnackBarBehavior.floating,
-            width: 280,
             duration: const Duration(seconds: 4),
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             action: SnackBarAction(
               label: 'View Cart',
               textColor: Colors.white,
@@ -348,7 +350,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             ),
             child: _isLoadingStore
                 ? const Center(child: CircularProgressIndicator())
-                : (_store?.isOpen ?? true)
+                : (_store?.isOpen ?? true) && widget.product.isInStock
                     ? Row(
                         children: [
                           Container(
@@ -422,7 +424,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              'Store is currently offline',
+                              !widget.product.isInStock
+                                  ? 'Item Out of Stock'
+                                  : 'Store is currently offline',
                               style: theme.textTheme.titleMedium?.copyWith(
                                 color: theme.colorScheme.error,
                                 fontWeight: FontWeight.bold,
@@ -430,8 +434,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              _store?.nextOpeningTime ??
-                                  'Will open tomorrow at 9am',
+                              !widget.product.isInStock
+                                  ? 'Check back later for restock'
+                                  : _store?.nextOpeningTime ??
+                                      'Will open tomorrow at 9am',
                               style: theme.textTheme.bodySmall,
                             ),
                           ],

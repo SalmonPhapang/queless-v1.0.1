@@ -23,7 +23,10 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
   final _productService = ProductService();
   final _cartService = FoodCartService();
   final _locationService = LocationService();
-  List<Product> _products = [];
+  List<Product> _allProducts = [];
+  List<Product> _filteredProducts = [];
+  List<Map<String, dynamic>> _categories = [];
+  ProductCategory? _selectedCategory;
   bool _isLoading = true;
   double? _distance;
 
@@ -40,12 +43,105 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
       final products =
           await _productService.getProductsByStore(widget.store.id);
       setState(() {
-        _products = products;
+        _allProducts = products;
+        _filteredProducts = products;
         _isLoading = false;
       });
+      _generateCategoriesFromProducts();
     } catch (e) {
       setState(() => _isLoading = false);
     }
+  }
+
+  void _filterByCategory(ProductCategory? category) {
+    setState(() {
+      _selectedCategory = category;
+      if (category == null) {
+        _filteredProducts = _allProducts;
+      } else {
+        _filteredProducts =
+            _allProducts.where((p) => p.category == category).toList();
+      }
+    });
+  }
+
+  void _generateCategoriesFromProducts() {
+    if (_allProducts.isEmpty) return;
+
+    final categories = <ProductCategory>{};
+    for (var product in _allProducts) {
+      categories.add(product.category);
+    }
+
+    final categoryList = categories.map<Map<String, dynamic>>((category) {
+      String name;
+      IconData icon;
+      switch (category) {
+        case ProductCategory.beer:
+          name = 'Beer';
+          icon = Icons.sports_bar;
+          break;
+        case ProductCategory.wine:
+          name = 'Wine';
+          icon = Icons.wine_bar;
+          break;
+        case ProductCategory.spirits:
+          name = 'Spirits';
+          icon = Icons.local_bar;
+          break;
+        case ProductCategory.mixers:
+          name = 'Mixers';
+          icon = Icons.local_drink;
+          break;
+        case ProductCategory.snacks:
+          name = 'Snacks';
+          icon = Icons.fastfood;
+          break;
+        case ProductCategory.food:
+          name = 'Food';
+          icon = Icons.restaurant;
+          break;
+        case ProductCategory.burgers:
+          name = 'Burgers';
+          icon = Icons.lunch_dining;
+          break;
+        case ProductCategory.pizza:
+          name = 'Pizza';
+          icon = Icons.local_pizza;
+          break;
+        case ProductCategory.chicken:
+          name = 'Chicken';
+          icon = Icons.restaurant;
+          break;
+        case ProductCategory.asian:
+          name = 'Asian';
+          icon = Icons.ramen_dining;
+          break;
+        case ProductCategory.desserts:
+          name = 'Desserts';
+          icon = Icons.cake;
+          break;
+        case ProductCategory.drinks:
+          name = 'Drinks';
+          icon = Icons.local_drink;
+          break;
+        case ProductCategory.groceries:
+          name = 'Groceries';
+          icon = Icons.shopping_basket;
+          break;
+        default:
+          name = 'Other';
+          icon = Icons.category;
+      }
+      return {'name': name, 'category': category, 'icon': icon};
+    }).toList();
+
+    categoryList.insert(
+        0, {'name': 'All', 'category': null, 'icon': Icons.all_inclusive});
+
+    setState(() {
+      _categories = categoryList;
+    });
   }
 
   Future<void> _updateDistance() async {
@@ -292,6 +388,8 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
                         ],
                       ),
                     ),
+                  _buildCategoryFilter(theme),
+                  const SizedBox(height: 16),
                   Text('Menu',
                       style: theme.textTheme.titleLarge
                           ?.copyWith(fontWeight: FontWeight.bold)),
@@ -309,7 +407,7 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
                     ),
                   ),
                 )
-              : _products.isEmpty
+              : _filteredProducts.isEmpty
                   ? SliverToBoxAdapter(
                       child: Center(
                         child: Padding(
@@ -326,15 +424,49 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
                       sliver: SliverList(
                         delegate: SliverChildBuilderDelegate(
                           (context, index) => FoodProductCard(
-                            product: _products[index],
+                            product: _filteredProducts[index],
                             onAddToCart: _addToCart,
                             store: widget.store,
                           ),
-                          childCount: _products.length,
+                          childCount: _filteredProducts.length,
                         ),
                       ),
                     ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCategoryFilter(ThemeData theme) {
+    if (_categories.length <= 1) return const SizedBox.shrink();
+
+    return Container(
+      height: 50,
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        itemCount: _categories.length,
+        itemBuilder: (context, index) {
+          final cat = _categories[index];
+          final isSelected = _selectedCategory == cat['category'];
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: FilterChip(
+              selected: isSelected,
+              label: Text(cat['name']),
+              onSelected: (_) => _filterByCategory(cat['category']),
+              avatar: Icon(cat['icon'],
+                  size: 16,
+                  color: isSelected ? Colors.white : theme.colorScheme.primary),
+              backgroundColor: theme.colorScheme.surface,
+              selectedColor: theme.colorScheme.primary,
+              labelStyle: TextStyle(
+                  fontSize: 12,
+                  color:
+                      isSelected ? Colors.white : theme.colorScheme.onSurface),
+            ),
+          );
+        },
       ),
     );
   }
@@ -367,7 +499,7 @@ class FoodProductCard extends StatelessWidget {
         );
       },
       child: Opacity(
-        opacity: store.isOpen ? 1.0 : 0.6,
+        opacity: store.isOpen && product.isInStock ? 1.0 : 0.6,
         child: Card(
           margin: const EdgeInsets.only(bottom: 12),
           child: Padding(
@@ -451,6 +583,26 @@ class FoodProductCard extends StatelessWidget {
                               child: PromoBadge(text: promo.badgeText),
                             ),
                           ),
+                        if (!product.isInStock)
+                          Positioned.fill(
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.4),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Center(
+                                child: Text(
+                                  'OUT OF\nSTOCK',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
                       ],
                     );
                   },
@@ -481,7 +633,7 @@ class FoodProductCard extends StatelessWidget {
                                 color: theme.colorScheme.primary,
                                 fontWeight: FontWeight.bold),
                           ),
-                          if (store.isOpen)
+                          if (store.isOpen && product.isInStock)
                             FilledButton.icon(
                               onPressed: () => onAddToCart(product),
                               icon: const Icon(Icons.add, size: 16),
@@ -494,7 +646,7 @@ class FoodProductCard extends StatelessWidget {
                             )
                           else
                             Text(
-                              'Offline',
+                              !product.isInStock ? 'Out of Stock' : 'Offline',
                               style: theme.textTheme.labelSmall?.copyWith(
                                 color: theme.colorScheme.error,
                                 fontWeight: FontWeight.bold,
@@ -544,8 +696,10 @@ class _FoodProductDetailScreenState extends State<FoodProductDetailScreen> {
             content: const Text('Added to Food Cart'),
             backgroundColor: theme.colorScheme.secondary,
             behavior: SnackBarBehavior.floating,
-            width: 280,
             duration: const Duration(seconds: 4),
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             action: SnackBarAction(
               label: 'View Cart',
               textColor: Colors.white,
