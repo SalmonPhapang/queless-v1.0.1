@@ -30,15 +30,15 @@ class ProductService {
     }
   }
 
-  Future<List<Product>> getProductsByCategory(ProductCategory category) async {
-    final cacheKey = 'products_cat_${category.name}';
+  Future<List<Product>> getProductsByCategory(String category) async {
+    final cacheKey = 'products_cat_$category';
     final cached = _cache.get<List<Product>>(cacheKey);
     if (cached != null) return cached;
 
     try {
       final data = await SupabaseService.select(
         'products',
-        filters: {'category': category.name},
+        filters: {'category': category},
         orderBy: 'name',
         ascending: true,
       );

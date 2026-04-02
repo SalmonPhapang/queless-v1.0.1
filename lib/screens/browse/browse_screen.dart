@@ -38,12 +38,12 @@ class _BrowseScreenState extends State<BrowseScreen> {
   List<Product> _products = [];
   List<Product> _filteredProducts = [];
   bool _isLoading = true;
-  ProductCategory? _selectedCategory;
+  String? _selectedCategory;
   Store? _nearestStore;
   double? _distanceToStore;
 
   // Dynamically derived categories from the loaded products
-  List<ProductCategory> _availableCategories = [];
+  List<String> _availableCategories = [];
 
   @override
   void initState() {
@@ -123,7 +123,7 @@ class _BrowseScreenState extends State<BrowseScreen> {
 
       // Extract available categories from the products
       final categories = productsToLoad.map((p) => p.category).toSet().toList();
-      categories.sort((a, b) => a.index.compareTo(b.index));
+      categories.sort((a, b) => a.compareTo(b));
 
       if (mounted) {
         setState(() {
@@ -275,17 +275,27 @@ class _BrowseScreenState extends State<BrowseScreen> {
                     }),
                   ),
                   const SizedBox(width: 8),
-                  ..._availableCategories.map((category) => Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: FilterChip(
-                          label: Text(category.displayName),
-                          selected: _selectedCategory == category,
-                          onSelected: (_) => setState(() {
-                            _selectedCategory = category;
-                            _filterProducts();
-                          }),
-                        ),
-                      )),
+                  ..._availableCategories.map((category) {
+                    // Capitalize first letter for display if it's all lowercase
+                    String displayName = category;
+                    if (displayName.isNotEmpty &&
+                        displayName == displayName.toLowerCase()) {
+                      displayName = displayName[0].toUpperCase() +
+                          displayName.substring(1);
+                    }
+
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: FilterChip(
+                        label: Text(displayName),
+                        selected: _selectedCategory == category,
+                        onSelected: (_) => setState(() {
+                          _selectedCategory = category;
+                          _filterProducts();
+                        }),
+                      ),
+                    );
+                  }),
                 ],
               ),
             ),

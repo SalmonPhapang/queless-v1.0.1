@@ -12,7 +12,7 @@ import 'package:queless/services/promotion_service.dart';
 import 'package:queless/widgets/promo_badge.dart';
 
 class CategoryScreen extends StatefulWidget {
-  final ProductCategory category;
+  final String category;
 
   const CategoryScreen({super.key, required this.category});
 
@@ -75,7 +75,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
 
       if (_nearestStore != null) {
         debugPrint(
-            '🔍 CategoryScreen: Fetching products for category ${widget.category.name} and store ${_nearestStore!.id}');
+            '🔍 CategoryScreen: Fetching products for category ${widget.category} and store ${_nearestStore!.id}');
         // Load products specifically from the nearest store and category
         final storeProducts =
             await _productService.getProductsByStoreId(_nearestStore!.id);
@@ -86,7 +86,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
             '🔍 CategoryScreen: Found ${productsToLoad.length} products');
       } else {
         debugPrint(
-            '🔍 CategoryScreen: Loading all products for category ${widget.category.name}');
+            '🔍 CategoryScreen: Loading all products for category ${widget.category}');
         productsToLoad =
             await _productService.getProductsByCategory(widget.category);
       }
@@ -110,7 +110,7 @@ class _CategoryScreenState extends State<CategoryScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: Text(widget.category.displayName)),
+      appBar: AppBar(title: Text(widget.category)),
       body: Column(
         children: [
           if (_nearestStore != null)

@@ -26,7 +26,7 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
   List<Product> _allProducts = [];
   List<Product> _filteredProducts = [];
   List<Map<String, dynamic>> _categories = [];
-  ProductCategory? _selectedCategory;
+  String? _selectedCategory;
   bool _isLoading = true;
   double? _distance;
 
@@ -53,7 +53,7 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
     }
   }
 
-  void _filterByCategory(ProductCategory? category) {
+  void _filterByCategory(String? category) {
     setState(() {
       _selectedCategory = category;
       if (category == null) {
@@ -68,73 +68,99 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
   void _generateCategoriesFromProducts() {
     if (_allProducts.isEmpty) return;
 
-    final categories = <ProductCategory>{};
+    final categoryNames = <String>{};
     for (var product in _allProducts) {
-      categories.add(product.category);
+      categoryNames.add(product.category);
     }
 
-    final categoryList = categories.map<Map<String, dynamic>>((category) {
-      String name;
+    final categoryList =
+        categoryNames.map<Map<String, dynamic>>((categoryName) {
+      String name = categoryName;
       IconData icon;
-      switch (category) {
-        case ProductCategory.beer:
-          name = 'Beer';
-          icon = Icons.sports_bar;
-          break;
-        case ProductCategory.wine:
-          name = 'Wine';
-          icon = Icons.wine_bar;
-          break;
-        case ProductCategory.spirits:
-          name = 'Spirits';
-          icon = Icons.local_bar;
-          break;
-        case ProductCategory.mixers:
-          name = 'Mixers';
-          icon = Icons.local_drink;
-          break;
-        case ProductCategory.snacks:
-          name = 'Snacks';
-          icon = Icons.fastfood;
-          break;
-        case ProductCategory.food:
-          name = 'Food';
-          icon = Icons.restaurant;
-          break;
-        case ProductCategory.burgers:
-          name = 'Burgers';
-          icon = Icons.lunch_dining;
-          break;
-        case ProductCategory.pizza:
-          name = 'Pizza';
-          icon = Icons.local_pizza;
-          break;
-        case ProductCategory.chicken:
-          name = 'Chicken';
-          icon = Icons.restaurant;
-          break;
-        case ProductCategory.asian:
-          name = 'Asian';
-          icon = Icons.ramen_dining;
-          break;
-        case ProductCategory.desserts:
-          name = 'Desserts';
-          icon = Icons.cake;
-          break;
-        case ProductCategory.drinks:
-          name = 'Drinks';
-          icon = Icons.local_drink;
-          break;
-        case ProductCategory.groceries:
-          name = 'Groceries';
-          icon = Icons.shopping_basket;
-          break;
-        default:
-          name = 'Other';
-          icon = Icons.category;
+
+      // Try to find a matching enum for the icon, or fallback to default
+      ProductCategory? enumCategory;
+      try {
+        enumCategory = ProductCategory.values.firstWhere(
+          (e) => e.name.toLowerCase() == categoryName.toLowerCase(),
+        );
+      } catch (_) {
+        enumCategory = null;
       }
-      return {'name': name, 'category': category, 'icon': icon};
+
+      if (enumCategory != null) {
+        switch (enumCategory) {
+          case ProductCategory.beer:
+            icon = Icons.sports_bar;
+            break;
+          case ProductCategory.wine:
+            icon = Icons.wine_bar;
+            break;
+          case ProductCategory.spirits:
+            icon = Icons.local_bar;
+            break;
+          case ProductCategory.mixers:
+            icon = Icons.local_drink;
+            break;
+          case ProductCategory.snacks:
+            icon = Icons.fastfood;
+            break;
+          case ProductCategory.food:
+            icon = Icons.restaurant;
+            break;
+          case ProductCategory.burgers:
+            icon = Icons.lunch_dining;
+            break;
+          case ProductCategory.pizza:
+            icon = Icons.local_pizza;
+            break;
+          case ProductCategory.chicken:
+            icon = Icons.restaurant;
+            break;
+          case ProductCategory.asian:
+            icon = Icons.ramen_dining;
+            break;
+          case ProductCategory.desserts:
+            icon = Icons.cake;
+            break;
+          case ProductCategory.drinks:
+            icon = Icons.local_drink;
+            break;
+          case ProductCategory.groceries:
+            icon = Icons.shopping_basket;
+            break;
+        }
+      } else {
+        // Handle common strings that might not be in the enum but we want icons for
+        final lowerName = name.toLowerCase();
+        if (lowerName.contains('burger')) {
+          icon = Icons.lunch_dining;
+        } else if (lowerName.contains('pizza')) {
+          icon = Icons.local_pizza;
+        } else if (lowerName.contains('drink') ||
+            lowerName.contains('beverage')) {
+          icon = Icons.local_drink;
+        } else if (lowerName.contains('dessert') ||
+            lowerName.contains('sweet')) {
+          icon = Icons.cake;
+        } else if (lowerName.contains('meat') ||
+            lowerName.contains('chicken')) {
+          icon = Icons.restaurant;
+        } else {
+          icon = Icons.category;
+        }
+      }
+
+      // Capitalize first letter for display if it's all lowercase
+      if (name.isNotEmpty && name == name.toLowerCase()) {
+        name = name[0].toUpperCase() + name.substring(1);
+      }
+
+      return {'name': name, 'category': categoryName, 'icon': icon};
     }).toList();
+
+    categoryList
+        .sort((a, b) => (a['name'] as String).compareTo(b['name'] as String));
 
     categoryList.insert(
         0, {'name': 'All', 'category': null, 'icon': Icons.all_inclusive});

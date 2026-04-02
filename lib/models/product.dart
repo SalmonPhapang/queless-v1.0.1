@@ -64,7 +64,7 @@ class Product {
 
   final String id;
   final String name;
-  final ProductCategory category;
+  final String category;
   final String? brand;
   final String description;
   final double price;
@@ -103,7 +103,7 @@ class Product {
   Map<String, dynamic> toJson() => {
         'id': id,
         'name': name,
-        'category': category.name,
+        'category': category,
         'brand': brand,
         'description': description,
         'price': price,
@@ -122,16 +122,7 @@ class Product {
   factory Product.fromJson(Map<String, dynamic> json) => Product(
         id: json['id'] as String,
         name: json['name'] as String,
-        category: ProductCategory.values.firstWhere(
-          (e) => e.name == json['category'],
-          orElse: () {
-            // Handle legacy categories or typos
-            final cat = json['category']?.toString().toLowerCase();
-            if (cat == 'restaurant') return ProductCategory.food;
-            if (cat == 'fast food') return ProductCategory.food;
-            return ProductCategory.food;
-          },
-        ),
+        category: json['category']?.toString() ?? 'Food',
         brand: json['brand'] as String?,
         description: json['description'] as String? ?? '',
         price: (json['price'] as num).toDouble() * (1 + feeRate),
@@ -156,7 +147,7 @@ class Product {
   Product copyWith({
     String? id,
     String? name,
-    ProductCategory? category,
+    String? category,
     String? brand,
     String? description,
     double? price,
