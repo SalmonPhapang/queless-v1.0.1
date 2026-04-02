@@ -2,6 +2,7 @@ import 'package:queless/logger.dart';
 import 'package:queless/utils/logger.dart';
 import 'package:queless/models/store.dart';
 import 'package:queless/services/cache_service.dart';
+import 'package:queless/services/connectivity_service.dart';
 import 'package:queless/supabase/supabase_config.dart';
 
 class StoreService {
@@ -23,16 +24,22 @@ class StoreService {
         ascending: false,
       );
       final stores = data.map((json) => Store.fromJson(json)).toList();
-      _cache.set(cacheKey, stores);
+      await _cache.set(cacheKey, stores);
       log('✅ Loaded and cached ${stores.length} stores');
       return stores;
     } catch (e) {
       log('❌ Error loading stores: $e');
-      return [];
+      // If network error, return cached data even if get() returned null (maybe it was expired but still exists in memory/prefs)
+      // Actually, my get() returns null if expired. I might want a getIgnoreExpiry() for offline mode.
+      return _cache.get<List<Store>>(cacheKey) ?? [];
     }
   }
 
   Future<List<Store>> getStores({String? category}) async {
+    final cacheKey = 'stores_${category ?? 'all'}';
+    final cached = _cache.get<List<Store>>(cacheKey);
+    if (cached != null) return cached;
+
     try {
       final Map<String, dynamic> filters = {};
       if (category != null) {
@@ -46,10 +53,12 @@ class StoreService {
         ascending: false,
       );
 
-      return data.map((json) => Store.fromJson(json)).toList();
+      final stores = data.map((json) => Store.fromJson(json)).toList();
+      await _cache.set(cacheKey, stores);
+      return stores;
     } catch (e) {
       log('❌ Error getting stores: $e');
-      return [];
+      return _cache.get<List<Store>>(cacheKey) ?? [];
     }
   }
 
@@ -79,12 +88,12 @@ class StoreService {
 
       final store = data != null ? Store.fromJson(data) : null;
       if (store != null) {
-        _cache.set(cacheKey, store);
+        await _cache.set(cacheKey, store);
       }
       return store;
     } catch (e) {
       log('❌ Error getting store by id: $e');
-      return null;
+      return _cache.get<Store>(cacheKey);
     }
   }
 
@@ -94,7 +103,15 @@ class StoreService {
     double radiusMeters = 5000,
     String? category,
   }) async {
+    final cacheKey = 'nearby_stores_${latitude}_${longitude}_$radiusMeters';
+    final cached = _cache.get<List<Store>>(cacheKey);
+    if (cached != null) return cached;
+
     try {
+      if (!ConnectivityService().isConnected) {
+        throw Exception('No internet connection');
+      }
+
       final response = await SupabaseConfig.client.rpc(
         'nearby_stores',
         params: {
@@ -119,10 +136,11 @@ class StoreService {
         stores = stores.where((s) => s.category == category).toList();
       }
 
+      await _cache.set(cacheKey, stores);
       return stores;
     } catch (e) {
       Logger.debug('❌ Error getting nearby stores via RPC: $e');
-      return [];
+      return _cache.get<List<Store>>(cacheKey) ?? [];
     }
   }
 

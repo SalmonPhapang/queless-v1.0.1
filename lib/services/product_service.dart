@@ -22,15 +22,19 @@ class ProductService {
         ascending: false,
       );
       final products = data.map((json) => Product.fromJson(json)).toList();
-      _cache.set(cacheKey, products);
+      await _cache.set(cacheKey, products);
       return products;
     } catch (e) {
       Logger.debug('Error loading products: $e');
-      return [];
+      return _cache.get<List<Product>>(cacheKey) ?? [];
     }
   }
 
   Future<List<Product>> getProductsByCategory(ProductCategory category) async {
+    final cacheKey = 'products_cat_${category.name}';
+    final cached = _cache.get<List<Product>>(cacheKey);
+    if (cached != null) return cached;
+
     try {
       final data = await SupabaseService.select(
         'products',
@@ -39,10 +43,12 @@ class ProductService {
         ascending: true,
       );
 
-      return data.map((json) => Product.fromJson(json)).toList();
+      final products = data.map((json) => Product.fromJson(json)).toList();
+      await _cache.set(cacheKey, products);
+      return products;
     } catch (e) {
       Logger.debug('Error getting products by category: $e');
-      return [];
+      return _cache.get<List<Product>>(cacheKey) ?? [];
     }
   }
 
@@ -117,12 +123,12 @@ class ProductService {
 
       final product = data != null ? Product.fromJson(data) : null;
       if (product != null) {
-        _cache.set(cacheKey, product);
+        await _cache.set(cacheKey, product);
       }
       return product;
     } catch (e) {
       Logger.debug('Error getting product by id: $e');
-      return null;
+      return _cache.get<Product>(cacheKey);
     }
   }
 
@@ -150,6 +156,10 @@ class ProductService {
   }
 
   Future<List<Product>> getProductsByStore(String storeId) async {
+    final cacheKey = 'products_store_$storeId';
+    final cached = _cache.get<List<Product>>(cacheKey);
+    if (cached != null) return cached;
+
     try {
       final data = await SupabaseService.select(
         'products',
@@ -159,7 +169,7 @@ class ProductService {
       );
 
       Logger.debug('📦 Loading ${data.length} products for store $storeId');
-      return data.map((json) {
+      final products = data.map((json) {
         try {
           return Product.fromJson(json);
         } catch (e) {
@@ -168,10 +178,13 @@ class ProductService {
           rethrow;
         }
       }).toList();
+
+      await _cache.set(cacheKey, products);
+      return products;
     } catch (e, stackTrace) {
       Logger.debug('Error getting products by store: $e');
       Logger.debug('Stack trace: $stackTrace');
-      return [];
+      return _cache.get<List<Product>>(cacheKey) ?? [];
     }
   }
 }

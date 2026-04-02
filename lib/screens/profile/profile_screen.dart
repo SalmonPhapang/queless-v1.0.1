@@ -92,7 +92,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('License Information'),
-        content: SingleChildScrollView(
+        content: const SingleChildScrollView(
           child: Text(ComplianceHelper.licenseInfo),
         ),
         actions: [
@@ -166,7 +166,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         if (user?.ageVerified == true)
                           Row(
                             children: [
-                              Icon(Icons.verified,
+                              const Icon(Icons.verified,
                                   size: 16, color: Colors.green),
                               const SizedBox(width: 6),
                               Text('Age Verified',
@@ -269,7 +269,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               title: 'Phone Number',
               subtitle: user?.phone ?? '',
             ),
-            ProfileMenuItem(
+            const ProfileMenuItem(
               icon: Icons.info_outlined,
               title: 'About Queless',
               subtitle: 'Version 1.0.0',

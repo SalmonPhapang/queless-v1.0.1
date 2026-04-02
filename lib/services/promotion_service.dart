@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:queless/models/promotion.dart';
 import 'package:queless/supabase/supabase_config.dart';
+import 'package:queless/services/cache_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class PromotionService extends ChangeNotifier {
@@ -8,6 +9,7 @@ class PromotionService extends ChangeNotifier {
   factory PromotionService() => _instance;
   PromotionService._internal();
 
+  final _cache = CacheService();
   List<Promotion> _activePromotions = [];
   bool _isLoading = false;
 
@@ -36,6 +38,8 @@ class PromotionService extends ChangeNotifier {
     // if this is called from initState or build methods.
     Future.microtask(() => notifyListeners());
 
+    const cacheKey = 'active_promotions';
+
     try {
       final rows = await SupabaseService.select(
         'promotions',
@@ -45,13 +49,14 @@ class PromotionService extends ChangeNotifier {
         limit: 50,
       );
 
-      final now = DateTime.now();
       _activePromotions = rows
           .map((row) => Promotion.fromJson(row))
           .where((p) => p.id.isNotEmpty && p.isCurrentlyActive)
           .toList();
+
+      await _cache.set(cacheKey, _activePromotions);
     } catch (_) {
-      _activePromotions = [];
+      _activePromotions = _cache.get<List<Promotion>>(cacheKey) ?? [];
     } finally {
       _isLoading = false;
       // Defer notification to avoid "setState() called during build" errors

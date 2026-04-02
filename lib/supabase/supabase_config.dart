@@ -1,6 +1,15 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:queless/services/connectivity_service.dart';
+
+/// Exception thrown when there's no network connection
+class NoNetworkException implements Exception {
+  final String message;
+  NoNetworkException([this.message = 'No internet connection available']);
+  @override
+  String toString() => message;
+}
 
 /// Generic Supabase configuration template
 /// Replace YOUR_ and YOUR_ with your actual values
@@ -23,6 +32,13 @@ class SupabaseConfig {
 
 /// Generic database service for CRUD operations
 class SupabaseService {
+  /// Check for network connectivity before making calls
+  static void _checkConnectivity() {
+    if (!ConnectivityService().isConnected) {
+      throw NoNetworkException();
+    }
+  }
+
   /// Select multiple records from a table
   static Future<List<Map<String, dynamic>>> select(
     String table, {
@@ -33,6 +49,7 @@ class SupabaseService {
     int? limit,
   }) async {
     try {
+      _checkConnectivity();
       dynamic query = SupabaseConfig.client.from(table).select(select ?? '*');
 
       // Apply filters
@@ -54,6 +71,7 @@ class SupabaseService {
 
       return await query;
     } catch (e) {
+      if (e is NoNetworkException) rethrow;
       throw _handleDatabaseError('select', table, e);
     }
   }
@@ -65,6 +83,7 @@ class SupabaseService {
     required Map<String, dynamic> filters,
   }) async {
     try {
+      _checkConnectivity();
       dynamic query = SupabaseConfig.client.from(table).select(select ?? '*');
 
       for (final entry in filters.entries) {
@@ -73,6 +92,7 @@ class SupabaseService {
 
       return await query.maybeSingle();
     } catch (e) {
+      if (e is NoNetworkException) rethrow;
       throw _handleDatabaseError('selectSingle', table, e);
     }
   }
@@ -83,8 +103,10 @@ class SupabaseService {
     Map<String, dynamic> data,
   ) async {
     try {
+      _checkConnectivity();
       return await SupabaseConfig.client.from(table).insert(data).select();
     } catch (e) {
+      if (e is NoNetworkException) rethrow;
       throw _handleDatabaseError('insert', table, e);
     }
   }
@@ -95,8 +117,10 @@ class SupabaseService {
     List<Map<String, dynamic>> data,
   ) async {
     try {
+      _checkConnectivity();
       return await SupabaseConfig.client.from(table).insert(data).select();
     } catch (e) {
+      if (e is NoNetworkException) rethrow;
       throw _handleDatabaseError('insertMultiple', table, e);
     }
   }
@@ -108,12 +132,14 @@ class SupabaseService {
     Map<String, dynamic>? filters,
   }) async {
     try {
+      _checkConnectivity();
       // For upsert, we typically don't use manual filters like in update/delete
       // unless we are doing something specific, but Supabase's upsert works on primary keys or unique constraints.
       // However, keeping the signature consistent might be useful, or we just pass data.
       // The Supabase Flutter SDK upsert method takes data and options.
       return await SupabaseConfig.client.from(table).upsert(data).select();
     } catch (e) {
+      if (e is NoNetworkException) rethrow;
       throw _handleDatabaseError('upsert', table, e);
     }
   }
@@ -125,6 +151,7 @@ class SupabaseService {
     required Map<String, dynamic> filters,
   }) async {
     try {
+      _checkConnectivity();
       dynamic query = SupabaseConfig.client.from(table).update(data);
 
       for (final entry in filters.entries) {
@@ -133,6 +160,7 @@ class SupabaseService {
 
       return await query.select();
     } catch (e) {
+      if (e is NoNetworkException) rethrow;
       throw _handleDatabaseError('update', table, e);
     }
   }
@@ -143,6 +171,7 @@ class SupabaseService {
     required Map<String, dynamic> filters,
   }) async {
     try {
+      _checkConnectivity();
       dynamic query = SupabaseConfig.client.from(table).delete();
 
       for (final entry in filters.entries) {
@@ -151,6 +180,7 @@ class SupabaseService {
 
       await query;
     } catch (e) {
+      if (e is NoNetworkException) rethrow;
       throw _handleDatabaseError('delete', table, e);
     }
   }

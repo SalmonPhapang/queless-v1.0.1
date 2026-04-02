@@ -22,8 +22,8 @@ class IdGenerator {
       _sequenceBits + _workerIdBits + _datacenterIdBits;
 
   static int _lastTimestamp = -1;
-  static int _workerId = 1; // Default
-  static int _datacenterId = 1; // Default
+  static final int _workerId = 1; // Default
+  static final int _datacenterId = 1; // Default
   static int _sequence = 0;
 
   /// Generates a Snowflake ID as a 64-bit integer.

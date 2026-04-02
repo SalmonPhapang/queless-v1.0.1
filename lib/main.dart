@@ -16,6 +16,9 @@ import 'package:queless/services/cart_service.dart';
 import 'package:queless/services/food_cart_service.dart';
 import 'package:queless/services/order_service.dart';
 import 'package:queless/services/theme_service.dart';
+import 'package:queless/services/cache_service.dart';
+import 'package:queless/services/connectivity_service.dart';
+import 'package:queless/widgets/network_connectivity_indicator.dart';
 import 'package:queless/router/auth_router.dart';
 import 'package:queless/utils/database_test.dart';
 import 'package:queless/config/app_config.dart';
@@ -253,7 +256,9 @@ Future<void> main() async {
   );
 
   await SupabaseConfig.initialize();
-  Logger.debug('✅ Supabase initialized');
+  await ConnectivityService().initialize();
+  await CacheService().init();
+  Logger.debug('✅ Supabase, Connectivity and Cache initialized');
 
   try {
     await DatabaseTest().runAllTests();
@@ -378,6 +383,14 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           theme: lightTheme,
           darkTheme: darkTheme,
           themeMode: ThemeService().themeMode,
+          builder: (context, child) {
+            return Column(
+              children: [
+                const NetworkConnectivityIndicator(),
+                Expanded(child: child!),
+              ],
+            );
+          },
           home: const AuthRouter(),
         );
       },

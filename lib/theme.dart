@@ -73,7 +73,7 @@ class FontSizes {
 
 ThemeData get lightTheme => ThemeData(
       useMaterial3: true,
-      colorScheme: ColorScheme.light(
+      colorScheme: const ColorScheme.light(
         primary: LightModeColors.lightPrimary,
         onPrimary: LightModeColors.lightOnPrimary,
         primaryContainer: LightModeColors.lightPrimaryContainer,
@@ -96,7 +96,7 @@ ThemeData get lightTheme => ThemeData(
       scaffoldBackgroundColor: LightModeColors.lightSurface,
       cardColor: LightModeColors.lightCardBackground,
       dividerColor: LightModeColors.lightDivider,
-      appBarTheme: AppBarTheme(
+      appBarTheme: const AppBarTheme(
           backgroundColor: LightModeColors.lightAppBarBackground,
           foregroundColor: LightModeColors.lightOnSurface,
           elevation: 0,
@@ -242,7 +242,7 @@ ThemeData get lightTheme => ThemeData(
 
 ThemeData get darkTheme => ThemeData(
       useMaterial3: true,
-      colorScheme: ColorScheme.dark(
+      colorScheme: const ColorScheme.dark(
         primary: DarkModeColors.darkPrimary,
         onPrimary: DarkModeColors.darkOnPrimary,
         primaryContainer: DarkModeColors.darkPrimaryContainer,
@@ -264,7 +264,7 @@ ThemeData get darkTheme => ThemeData(
       scaffoldBackgroundColor: DarkModeColors.darkSurface,
       cardColor: DarkModeColors.darkCardBackground,
       dividerColor: DarkModeColors.darkDivider,
-      appBarTheme: AppBarTheme(
+      appBarTheme: const AppBarTheme(
         backgroundColor: DarkModeColors.darkAppBarBackground,
         foregroundColor: DarkModeColors.darkOnSurface,
         elevation: 0,

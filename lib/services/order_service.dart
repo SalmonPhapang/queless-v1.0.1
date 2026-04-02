@@ -199,8 +199,8 @@ class OrderService {
     if (user == null) return [];
 
     final cacheKey = 'user_orders_${user.id}';
-    final cachedOrders = _cache.get<List<Order>>(cacheKey);
-    if (cachedOrders != null) return cachedOrders;
+    final cached = _cache.get<List<Order>>(cacheKey);
+    if (cached != null) return cached;
 
     try {
       final data = await SupabaseService.select(
@@ -222,7 +222,7 @@ class OrderService {
           .whereType<Order>()
           .toList();
 
-      _cache.set(cacheKey, orders, duration: const Duration(minutes: 5));
+      await _cache.set(cacheKey, orders, duration: const Duration(minutes: 5));
 
       // Run stale order cancellation in background
       _autoCancelStalePendingOrders(orders).catchError((e) {
@@ -232,7 +232,7 @@ class OrderService {
       return orders;
     } catch (e) {
       Logger.debug('Error getting user orders: $e');
-      rethrow;
+      return _cache.get<List<Order>>(cacheKey) ?? [];
     }
   }
 
@@ -267,12 +267,12 @@ class OrderService {
 
       final order = data != null ? Order.fromJson(data) : null;
       if (order != null) {
-        _cache.set(cacheKey, order, duration: const Duration(minutes: 5));
+        await _cache.set(cacheKey, order, duration: const Duration(minutes: 5));
       }
       return order;
     } catch (e) {
       Logger.debug('Error getting order by id: $e');
-      return null;
+      return _cache.get<Order>(cacheKey);
     }
   }
 

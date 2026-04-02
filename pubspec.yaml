@@ -25,6 +25,7 @@ dependencies:
   url_launcher: ^6.3.2
   cached_network_image: ^3.4.1
   flutter_dotenv: ^5.1.0
+  connectivity_plus: ^6.0.3
 
 dev_dependencies:
   flutter_test:
