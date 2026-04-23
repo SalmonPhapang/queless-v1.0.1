@@ -12,8 +12,14 @@ class ProductService {
 
   Future<List<Product>> getAllProducts() async {
     const cacheKey = 'all_products';
-    final cached = _cache.get<List<Product>>(cacheKey);
-    if (cached != null) return cached;
+    final cachedDynamic = _cache.get<dynamic>(cacheKey);
+    if (cachedDynamic != null && cachedDynamic is List) {
+      return cachedDynamic
+          .map((json) => json is Product
+              ? json
+              : Product.fromJson(json as Map<String, dynamic>))
+          .toList();
+    }
 
     try {
       final data = await SupabaseService.select(
@@ -22,18 +28,33 @@ class ProductService {
         ascending: false,
       );
       final products = data.map((json) => Product.fromJson(json)).toList();
-      await _cache.set(cacheKey, products);
+      final productsJson = products.map((p) => p.toJson()).toList();
+      await _cache.set(cacheKey, productsJson);
       return products;
     } catch (e) {
       Logger.debug('Error loading products: $e');
-      return _cache.get<List<Product>>(cacheKey) ?? [];
+      final cached = _cache.get<dynamic>(cacheKey);
+      if (cached != null && cached is List) {
+        return cached
+            .map((json) => json is Product
+                ? json
+                : Product.fromJson(json as Map<String, dynamic>))
+            .toList();
+      }
+      return [];
     }
   }
 
   Future<List<Product>> getProductsByCategory(String category) async {
     final cacheKey = 'products_cat_$category';
-    final cached = _cache.get<List<Product>>(cacheKey);
-    if (cached != null) return cached;
+    final cachedDynamic = _cache.get<dynamic>(cacheKey);
+    if (cachedDynamic != null && cachedDynamic is List) {
+      return cachedDynamic
+          .map((json) => json is Product
+              ? json
+              : Product.fromJson(json as Map<String, dynamic>))
+          .toList();
+    }
 
     try {
       final data = await SupabaseService.select(
@@ -44,11 +65,20 @@ class ProductService {
       );
 
       final products = data.map((json) => Product.fromJson(json)).toList();
-      await _cache.set(cacheKey, products);
+      final productsJson = products.map((p) => p.toJson()).toList();
+      await _cache.set(cacheKey, productsJson);
       return products;
     } catch (e) {
       Logger.debug('Error getting products by category: $e');
-      return _cache.get<List<Product>>(cacheKey) ?? [];
+      final cached = _cache.get<dynamic>(cacheKey);
+      if (cached != null && cached is List) {
+        return cached
+            .map((json) => json is Product
+                ? json
+                : Product.fromJson(json as Map<String, dynamic>))
+            .toList();
+      }
+      return [];
     }
   }
 
@@ -65,6 +95,16 @@ class ProductService {
   }
 
   Future<List<Product>> getLocalBrandProducts() async {
+    const cacheKey = 'products_local_brands';
+    final cachedDynamic = _cache.get<dynamic>(cacheKey);
+    if (cachedDynamic != null && cachedDynamic is List) {
+      return cachedDynamic
+          .map((json) => json is Product
+              ? json
+              : Product.fromJson(json as Map<String, dynamic>))
+          .toList();
+    }
+
     try {
       final data = await SupabaseService.select(
         'products',
@@ -73,47 +113,72 @@ class ProductService {
         ascending: true,
       );
 
-      return data.map((json) => Product.fromJson(json)).toList();
+      final products = data.map((json) => Product.fromJson(json)).toList();
+      final productsJson = products.map((p) => p.toJson()).toList();
+      await _cache.set(cacheKey, productsJson);
+      return products;
     } catch (e) {
       Logger.debug('Error getting local brand products: $e');
+      final cached = _cache.get<dynamic>(cacheKey);
+      if (cached != null && cached is List) {
+        return cached
+            .map((json) => json is Product
+                ? json
+                : Product.fromJson(json as Map<String, dynamic>))
+            .toList();
+      }
       return [];
     }
   }
 
   Future<List<Product>> getFeaturedProducts() async {
+    const cacheKey = 'products_featured';
+    final cachedDynamic = _cache.get<dynamic>(cacheKey);
+    if (cachedDynamic != null && cachedDynamic is List) {
+      return cachedDynamic
+          .map((json) => json is Product
+              ? json
+              : Product.fromJson(json as Map<String, dynamic>))
+          .toList();
+    }
+
     try {
       final data = await SupabaseService.select(
         'products',
         limit: 6,
       );
 
-      return data.map((json) => Product.fromJson(json)).toList();
+      final products = data.map((json) => Product.fromJson(json)).toList();
+      final productsJson = products.map((p) => p.toJson()).toList();
+      await _cache.set(cacheKey, productsJson);
+      return products;
     } catch (e) {
       Logger.debug('Error getting featured products: $e');
+      final cached = _cache.get<dynamic>(cacheKey);
+      if (cached != null && cached is List) {
+        return cached
+            .map((json) => json is Product
+                ? json
+                : Product.fromJson(json as Map<String, dynamic>))
+            .toList();
+      }
       return [];
     }
   }
 
   Future<List<Product>> getProductsByStoreId(String storeId) async {
-    try {
-      final data = await SupabaseService.select(
-        'products',
-        filters: {'store_id': storeId},
-        orderBy: 'name',
-        ascending: true,
-      );
-
-      return data.map((json) => Product.fromJson(json)).toList();
-    } catch (e) {
-      Logger.debug('Error getting products by store id: $e');
-      return [];
-    }
+    return getProductsByStore(storeId);
   }
 
   Future<Product?> getProductById(String id) async {
     final cacheKey = 'product_$id';
-    final cachedProduct = _cache.get<Product>(cacheKey);
-    if (cachedProduct != null) return cachedProduct;
+    final cachedDynamic = _cache.get<dynamic>(cacheKey);
+    if (cachedDynamic != null) {
+      if (cachedDynamic is Product) return cachedDynamic;
+      if (cachedDynamic is Map<String, dynamic>) {
+        return Product.fromJson(cachedDynamic);
+      }
+    }
 
     try {
       final data = await SupabaseService.selectSingle(
@@ -123,12 +188,17 @@ class ProductService {
 
       final product = data != null ? Product.fromJson(data) : null;
       if (product != null) {
-        await _cache.set(cacheKey, product);
+        await _cache.set(cacheKey, product.toJson());
       }
       return product;
     } catch (e) {
       Logger.debug('Error getting product by id: $e');
-      return _cache.get<Product>(cacheKey);
+      final cached = _cache.get<dynamic>(cacheKey);
+      if (cached != null) {
+        if (cached is Product) return cached;
+        if (cached is Map<String, dynamic>) return Product.fromJson(cached);
+      }
+      return null;
     }
   }
 
@@ -140,6 +210,16 @@ class ProductService {
   }
 
   Future<List<Product>> getProductsByType(ProductType type) async {
+    final cacheKey = 'products_type_${type.name}';
+    final cachedDynamic = _cache.get<dynamic>(cacheKey);
+    if (cachedDynamic != null && cachedDynamic is List) {
+      return cachedDynamic
+          .map((json) => json is Product
+              ? json
+              : Product.fromJson(json as Map<String, dynamic>))
+          .toList();
+    }
+
     try {
       final data = await SupabaseService.select(
         'products',
@@ -148,17 +228,34 @@ class ProductService {
         ascending: false,
       );
 
-      return data.map((json) => Product.fromJson(json)).toList();
+      final products = data.map((json) => Product.fromJson(json)).toList();
+      final productsJson = products.map((p) => p.toJson()).toList();
+      await _cache.set(cacheKey, productsJson);
+      return products;
     } catch (e) {
       Logger.debug('Error getting products by type: $e');
+      final cached = _cache.get<dynamic>(cacheKey);
+      if (cached != null && cached is List) {
+        return cached
+            .map((json) => json is Product
+                ? json
+                : Product.fromJson(json as Map<String, dynamic>))
+            .toList();
+      }
       return [];
     }
   }
 
   Future<List<Product>> getProductsByStore(String storeId) async {
     final cacheKey = 'products_store_$storeId';
-    final cached = _cache.get<List<Product>>(cacheKey);
-    if (cached != null) return cached;
+    final cachedDynamic = _cache.get<dynamic>(cacheKey);
+    if (cachedDynamic != null && cachedDynamic is List) {
+      return cachedDynamic
+          .map((json) => json is Product
+              ? json
+              : Product.fromJson(json as Map<String, dynamic>))
+          .toList();
+    }
 
     try {
       final data = await SupabaseService.select(
@@ -179,12 +276,21 @@ class ProductService {
         }
       }).toList();
 
-      await _cache.set(cacheKey, products);
+      final productsJson = products.map((p) => p.toJson()).toList();
+      await _cache.set(cacheKey, productsJson);
       return products;
     } catch (e, stackTrace) {
       Logger.debug('Error getting products by store: $e');
       Logger.debug('Stack trace: $stackTrace');
-      return _cache.get<List<Product>>(cacheKey) ?? [];
+      final cached = _cache.get<dynamic>(cacheKey);
+      if (cached != null && cached is List) {
+        return cached
+            .map((json) => json is Product
+                ? json
+                : Product.fromJson(json as Map<String, dynamic>))
+            .toList();
+      }
+      return [];
     }
   }
 }

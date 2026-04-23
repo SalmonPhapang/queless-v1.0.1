@@ -190,10 +190,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         );
       }
     } catch (e) {
+      debugPrint('Checkout Screen Error: $e');
       if (mounted) {
         SnackBarHelper.showError(
           context,
-          'Something went wrong while placing your order. Please try again.',
+          'Error: $e',
         );
       }
     } finally {
@@ -621,10 +622,11 @@ class _FoodCheckoutScreenState extends State<FoodCheckoutScreen> {
         );
       }
     } catch (e) {
+      debugPrint('Food Checkout Screen Error: $e');
       if (mounted) {
         SnackBarHelper.showError(
           context,
-          'Something went wrong while placing your order. Please try again.',
+          'Error: $e',
         );
       }
     } finally {

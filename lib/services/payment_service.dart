@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:queless/models/payment.dart';
 import 'package:queless/services/auth_service.dart';
 import 'package:queless/services/order_service.dart';
+import 'package:queless/services/store_service.dart';
 import 'package:queless/models/order.dart';
 import 'package:queless/supabase/supabase_config.dart';
 
@@ -11,6 +12,30 @@ class PaymentService {
   PaymentService._internal();
 
   final _authService = AuthService();
+  final _storeService = StoreService();
+
+  Future<Map<String, dynamic>?> getSplitDetails(String orderId) async {
+    try {
+      final orderService = OrderService();
+      final order = await orderService.getOrderById(orderId);
+      if (order == null || order.storeId == null) return null;
+
+      final store = await _storeService.getStoreById(order.storeId!);
+      if (store == null || store.subaccountCode == null) return null;
+
+      // The store gets the pre-calculated store_share (base item amounts)
+      // Queless gets the queless_share (markup + delivery fee - discount)
+      final storeAmount = order.storeShare;
+
+      return {
+        'subaccount_code': store.subaccountCode,
+        'store_amount': storeAmount,
+      };
+    } catch (e) {
+      debugPrint('Error getting split details: $e');
+      return null;
+    }
+  }
 
   Future<Payment> createPayment({
     required String orderId,
@@ -164,7 +189,7 @@ class PaymentService {
       final orderService = OrderService();
       final paymentStatusEnum = PaymentStatus.values.firstWhere(
           (e) => e.name.toLowerCase() == mappedStatus.toLowerCase(),
-          orElse: () => PaymentStatus.failed);
+          orElse: () => PaymentStatus.awaitingPayment);
 
       await orderService.updateOrderPaymentStatus(
           payment.orderId, paymentStatusEnum);
@@ -192,6 +217,11 @@ class PaymentService {
         } catch (e) {
           debugPrint('Error invoking new-order-notify: $e');
         }
+      } else if (mappedStatus == 'awaitingPayment') {
+        await orderService.updateOrderStatus(
+          payment.orderId,
+          OrderStatus.awaitingPayment,
+        );
       }
     } catch (e) {
       debugPrint('Error syncing order after payment: $e');
@@ -209,11 +239,31 @@ class PaymentService {
       return 'pending';
     }
 
-    if (value.contains('cancel') || value.contains('fail')) {
-      return 'failed';
+    if (value.contains('cancel') ||
+        value.contains('fail') ||
+        value.contains('payment_failed')) {
+      return 'awaitingPayment';
     }
 
-    return 'failed';
+    return 'awaitingPayment';
+  }
+
+  Future<Payment> refreshPaymentReference(String paymentId) async {
+    final newReference = 'QUE${DateTime.now().millisecondsSinceEpoch}';
+    try {
+      final result = await SupabaseService.update(
+        'payments',
+        {
+          'payment_reference': newReference,
+          'updated_at': DateTime.now().toIso8601String(),
+        },
+        filters: {'id': paymentId},
+      );
+      return Payment.fromJson(result.first);
+    } catch (e) {
+      debugPrint('Error refreshing payment reference: $e');
+      rethrow;
+    }
   }
 
   Future<Payment?> getPaymentById(String paymentId) async {

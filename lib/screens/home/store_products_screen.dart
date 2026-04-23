@@ -10,6 +10,7 @@ import 'package:queless/widgets/promo_badge.dart';
 import 'package:queless/utils/formatters.dart';
 import 'package:queless/screens/cart/cart_screen.dart';
 import 'package:queless/screens/product/product_detail_screen.dart';
+import 'package:queless/utils/snack_bar_helper.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 class StoreProductsScreen extends StatefulWidget {
@@ -211,64 +212,143 @@ class _StoreProductsScreenState extends State<StoreProductsScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.store.name),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildCategoryFilter(theme),
+                _buildStoreHeader(theme),
+                _buildCategoryChips(),
                 Expanded(
-                  child: _filteredProducts.isEmpty
-                      ? _buildEmptyState(theme)
-                      : GridView.builder(
-                          padding: const EdgeInsets.all(16),
-                          gridDelegate:
-                              const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            childAspectRatio: 0.65, // Adjusted for more content
-                            crossAxisSpacing: 16,
-                            mainAxisSpacing: 16,
-                          ),
-                          itemCount: _filteredProducts.length,
-                          itemBuilder: (context, index) => _ProductCard(
-                            product: _filteredProducts[index],
-                            store: widget.store,
-                          ),
-                        ),
+                  child: _buildProductList(theme),
                 ),
+                _buildBottomActions(theme),
               ],
             ),
     );
   }
 
-  Widget _buildCategoryFilter(ThemeData theme) {
+  Widget _buildBottomActions(ThemeData theme) {
     return Container(
-      height: 60,
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, -5),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: () => Navigator.of(context).pop(),
+            icon: const Icon(Icons.arrow_back),
+            label: const Text('Back to Stores'),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStoreHeader(ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        boxShadow: [
+          BoxShadow(
+            color: theme.colorScheme.shadow.withOpacity(0.1),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            widget.store.name,
+            style: theme.textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            widget.store.cuisineTypes.join(', '),
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurface.withOpacity(0.7),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Icon(Icons.star_rounded,
+                  color: theme.colorScheme.tertiary, size: 18),
+              const SizedBox(width: 4),
+              Text(
+                '${widget.store.rating} (${widget.store.totalReviews} reviews)',
+                style: theme.textTheme.bodySmall,
+              ),
+              const SizedBox(width: 16),
+              Icon(Icons.delivery_dining_rounded,
+                  color: theme.colorScheme.primary, size: 18),
+              const SizedBox(width: 4),
+              Text(
+                '${widget.store.deliveryTimeMin}-${widget.store.deliveryTimeMax} min',
+                style: theme.textTheme.bodySmall,
+              ),
+              const SizedBox(width: 16),
+              Icon(Icons.location_on_rounded,
+                  color: theme.colorScheme.secondary, size: 18),
+              const SizedBox(width: 4),
+              Text(
+                _distance != null ? '${_distance!.toStringAsFixed(1)} km' : '',
+                style: theme.textTheme.bodySmall,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCategoryChips() {
+    return Container(
+      height: 50,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
         itemCount: _categories.length,
         itemBuilder: (context, index) {
-          final cat = _categories[index];
-          final isSelected = _selectedCategory == cat['category'];
+          final category = _categories[index];
+          final isSelected = category['category'] == _selectedCategory;
           return Padding(
             padding: const EdgeInsets.only(right: 8),
-            child: FilterChip(
+            child: ChoiceChip(
+              label: Text(category['name']),
               selected: isSelected,
-              label: Text(cat['name']),
-              onSelected: (_) => _filterByCategory(cat['category']),
-              avatar: Icon(cat['icon'],
-                  size: 18,
-                  color: isSelected ? Colors.white : theme.colorScheme.primary),
-              backgroundColor: theme.colorScheme.surface,
-              selectedColor: theme.colorScheme.primary,
-              labelStyle: TextStyle(
-                  color:
-                      isSelected ? Colors.white : theme.colorScheme.onSurface),
+              onSelected: (_) => _filterByCategory(category['category']),
+              avatar: Icon(category['icon'], size: 18),
             ),
           );
         },
@@ -276,209 +356,185 @@ class _StoreProductsScreenState extends State<StoreProductsScreen> {
     );
   }
 
-  Widget _buildEmptyState(ThemeData theme) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.search_off_rounded,
-              size: 64,
-              color: theme.colorScheme.outline.withValues(alpha: 0.5)),
-          const SizedBox(height: 16),
-          Text(
-            'No products found in this category',
-            style: theme.textTheme.bodyLarge
-                ?.copyWith(color: theme.colorScheme.outline),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ProductCard extends StatelessWidget {
-  final Product product;
-  final Store store;
-
-  const _ProductCard({required this.product, required this.store});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cartService = CartService();
-
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(
-              builder: (_) => ProductDetailScreen(product: product)),
-        ),
+  Widget _buildProductList(ThemeData theme) {
+    if (_filteredProducts.isEmpty) {
+      return Center(
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Image Section
-            Expanded(
-              flex: 5,
-              child: Stack(
-                children: [
-                  Container(
-                    width: double.infinity,
-                    color:
-                        theme.colorScheme.surfaceVariant.withValues(alpha: 0.3),
-                    child: product.imageUrl.isNotEmpty
-                        ? CachedNetworkImage(
-                            imageUrl: product.imageUrl,
-                            fit: BoxFit.contain,
-                            placeholder: (context, url) => const Center(
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2)),
-                            errorWidget: (context, url, error) => const Center(
-                                child: Icon(Icons.local_bar, size: 48)),
-                          )
-                        : const Center(child: Icon(Icons.local_bar, size: 48)),
-                  ),
-                  AnimatedBuilder(
-                    animation: PromotionService(),
-                    builder: (context, _) {
-                      final promo =
-                          PromotionService().promotionForProduct(product.id);
-                      if (promo == null) return const SizedBox.shrink();
-                      return Positioned(
-                        top: 8,
-                        left: 8,
-                        child: Transform.scale(
-                          scale: 0.8,
-                          alignment: Alignment.topLeft,
-                          child: PromoBadge(text: promo.badgeText),
-                        ),
-                      );
-                    },
-                  ),
-                  if (product.isLocalBrand)
-                    Positioned(
-                      top: 8,
-                      right: 8,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.green,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: const Text(
-                          'LOCAL',
-                          style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 8,
-                              fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            // Info Section
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    product.name,
-                    style: theme.textTheme.titleSmall
-                        ?.copyWith(fontWeight: FontWeight.bold),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    product.volume ?? '',
-                    style: theme.textTheme.bodySmall
-                        ?.copyWith(color: theme.colorScheme.outline),
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        Formatters.formatCurrency(product.price),
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          color: theme.colorScheme.primary,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            // Action Section
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: store.isOpen && product.isInStock
-                      ? () async {
-                          await cartService.addItem(product);
-                          if (context.mounted) {
-                            _showAddedSnackBar(context, theme, product);
-                          }
-                        }
-                      : null,
-                  style: ElevatedButton.styleFrom(
-                    padding: EdgeInsets.zero,
-                    minimumSize: const Size(0, 32),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8)),
-                    backgroundColor: store.isOpen && product.isInStock
-                        ? null
-                        : theme.colorScheme.surfaceVariant,
-                  ),
-                  child: Text(
-                    !product.isInStock
-                        ? 'Out of Stock'
-                        : store.isOpen
-                            ? 'Add to Cart'
-                            : 'Offline',
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                ),
-              ),
+            Icon(Icons.search_off,
+                size: 64, color: theme.colorScheme.onSurface.withOpacity(0.3)),
+            const SizedBox(height: 16),
+            Text(
+              'No products found in this category',
+              style: theme.textTheme.titleMedium,
             ),
           ],
         ),
-      ),
-    );
-  }
+      );
+    }
 
-  void _showAddedSnackBar(
-      BuildContext context, ThemeData theme, Product product) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Added to Alcohol Cart'),
-        backgroundColor: theme.colorScheme.secondary,
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 4),
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        action: SnackBarAction(
-          label: 'View Cart',
-          textColor: Colors.white,
-          onPressed: () {
-            Navigator.push(
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: _filteredProducts.length,
+      itemBuilder: (context, index) {
+        final product = _filteredProducts[index];
+        final promoService = PromotionService();
+
+        return Card(
+          margin: const EdgeInsets.only(bottom: 16),
+          elevation: 1,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: InkWell(
+            onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => const CartScreen(),
+                builder: (_) => ProductDetailScreen(product: product),
               ),
-            );
-          },
-        ),
-      ),
+            ),
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Stack(
+                      children: [
+                        CachedNetworkImage(
+                          imageUrl: product.imageUrl,
+                          width: 80,
+                          height: 80,
+                          fit: BoxFit.cover,
+                          placeholder: (context, url) => Container(
+                            width: 80,
+                            height: 80,
+                            color: theme.colorScheme.surfaceContainerHighest,
+                          ),
+                          errorWidget: (context, url, error) => Container(
+                            width: 80,
+                            height: 80,
+                            color: theme.colorScheme.surfaceContainerHighest,
+                            child: Icon(Icons.broken_image,
+                                color: theme.colorScheme.onSurface),
+                          ),
+                        ),
+                        AnimatedBuilder(
+                          animation: promoService,
+                          builder: (context, _) {
+                            final promo =
+                                promoService.promotionForProduct(product.id);
+                            if (promo != null && promo.badgeText != null) {
+                              return Positioned(
+                                top: 4,
+                                left: 4,
+                                child: PromoBadge(text: promo.badgeText!),
+                              );
+                            }
+                            return const SizedBox.shrink();
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          product.name,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            color: product.isInStock
+                                ? theme.colorScheme.onSurface
+                                : theme.colorScheme.onSurface.withOpacity(0.5),
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (product.brand != null && product.brand!.isNotEmpty)
+                          Text(
+                            product.brand!,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurface
+                                  .withOpacity(product.isInStock ? 0.7 : 0.4),
+                            ),
+                          ),
+                        const SizedBox(height: 4),
+                        Text(
+                          product.description,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurface
+                                .withOpacity(product.isInStock ? 1.0 : 0.4),
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: 12,
+                          runSpacing: 4,
+                          children: [
+                            Text(
+                              Formatters.formatCurrency(product.price),
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: product.isInStock
+                                    ? theme.colorScheme.primary
+                                    : theme.colorScheme.primary
+                                        .withOpacity(0.5),
+                              ),
+                            ),
+                            if (!product.isInStock)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: theme.colorScheme.errorContainer,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  'OUT OF STOCK',
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    color: theme.colorScheme.error,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(
+                      Icons.add_shopping_cart,
+                      color: product.isInStock
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.onSurface.withOpacity(0.2),
+                    ),
+                    onPressed: product.isInStock
+                        ? () {
+                            if (widget.store.category == 'food') {
+                              FoodCartService().addItem(product);
+                            } else {
+                              CartService().addItem(product);
+                            }
+                            SnackBarHelper.showSuccess(
+                                context, '${product.name} added to cart!');
+                          }
+                        : null,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

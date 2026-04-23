@@ -19,9 +19,11 @@ dependencies:
   supabase_flutter: '>=1.10.0'
   firebase_core: ^4.3.0
   firebase_messaging: ^16.1.0
+  huawei_hmsavailability: ^6.11.0+300
   flutter_local_notifications: ^19.0.0
   flutter_ozow: ^1.0.4
-  paystack_for_flutter: any
+  http: ^1.2.1
+  webview_flutter: ^4.7.0
   url_launcher: ^6.3.2
   cached_network_image: ^3.4.1
   flutter_dotenv: ^5.1.0

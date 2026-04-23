@@ -127,6 +127,9 @@ class OrderCard extends StatelessWidget {
     final theme = Theme.of(context);
     switch (status) {
       case OrderStatus.pending:
+        return Colors.grey;
+      case OrderStatus.awaitingPayment:
+        return Colors.blue;
       case OrderStatus.confirmed:
         return Colors.orange;
       case OrderStatus.preparing:
@@ -136,6 +139,8 @@ class OrderCard extends StatelessWidget {
         return Colors.green;
       case OrderStatus.cancelled:
         return theme.colorScheme.error;
+      default:
+        return Colors.grey;
     }
   }
 
@@ -172,13 +177,17 @@ class OrderCard extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    order.orderNumber.isNotEmpty
-                        ? order.orderNumber
-                        : 'Order #${order.id.substring(0, 8)}',
-                    style: theme.textTheme.titleMedium
-                        ?.copyWith(fontWeight: FontWeight.bold),
+                  Expanded(
+                    child: Text(
+                      order.orderNumber.isNotEmpty
+                          ? order.orderNumber
+                          : 'Order #${order.id.substring(0, 8)}',
+                      style: theme.textTheme.titleMedium
+                          ?.copyWith(fontWeight: FontWeight.bold),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
+                  const SizedBox(width: 12),
                   Container(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -239,10 +248,15 @@ class OrderCard extends StatelessWidget {
                       color:
                           theme.colorScheme.onSurface.withValues(alpha: 0.6)),
                   const SizedBox(width: 6),
-                  Text(Formatters.formatDateTime(order.createdAt),
+                  Expanded(
+                    child: Text(
+                      Formatters.formatDateTime(order.createdAt),
                       style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurface
-                              .withValues(alpha: 0.6))),
+                              .withValues(alpha: 0.6)),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 8),
@@ -269,12 +283,20 @@ class OrderCard extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('${order.totalItems} items',
-                      style: theme.textTheme.bodyMedium),
-                  Text(Formatters.formatCurrency(order.total),
-                      style: theme.textTheme.titleMedium?.copyWith(
-                          color: theme.colorScheme.primary,
-                          fontWeight: FontWeight.bold)),
+                  Expanded(
+                    child: Text(
+                      '${order.totalItems} items',
+                      style: theme.textTheme.bodyMedium,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    Formatters.formatCurrency(order.total),
+                    style: theme.textTheme.titleMedium?.copyWith(
+                        color: theme.colorScheme.primary,
+                        fontWeight: FontWeight.bold),
+                  ),
                 ],
               ),
             ],

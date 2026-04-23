@@ -4,6 +4,7 @@ import 'package:queless/models/user.dart';
 
 enum OrderStatus {
   pending,
+  awaitingPayment,
   confirmed,
   preparing,
   outForDelivery,
@@ -14,6 +15,8 @@ enum OrderStatus {
     switch (this) {
       case OrderStatus.pending:
         return 'Pending';
+      case OrderStatus.awaitingPayment:
+        return 'Awaiting Payment';
       case OrderStatus.confirmed:
         return 'Confirmed';
       case OrderStatus.preparing:
@@ -30,6 +33,7 @@ enum OrderStatus {
 
 enum PaymentStatus {
   pending,
+  awaitingPayment,
   completed,
   failed,
   refunded;
@@ -38,6 +42,8 @@ enum PaymentStatus {
     switch (this) {
       case PaymentStatus.pending:
         return 'Pending';
+      case PaymentStatus.awaitingPayment:
+        return 'Awaiting Payment';
       case PaymentStatus.completed:
         return 'Completed';
       case PaymentStatus.failed:
@@ -54,6 +60,7 @@ class OrderItem {
   final String productImageUrl;
   final int quantity;
   final double pricePerUnit;
+  final double basePricePerUnit;
   final double totalPrice;
 
   OrderItem({
@@ -62,6 +69,7 @@ class OrderItem {
     required this.productImageUrl,
     required this.quantity,
     required this.pricePerUnit,
+    required this.basePricePerUnit,
     required this.totalPrice,
   });
 
@@ -71,6 +79,7 @@ class OrderItem {
         'product_image_url': productImageUrl,
         'quantity': quantity,
         'price_per_unit': pricePerUnit,
+        'base_price_per_unit': basePricePerUnit,
         'total_price': totalPrice,
       };
 
@@ -80,6 +89,8 @@ class OrderItem {
         productImageUrl: json['product_image_url']?.toString() ?? '',
         quantity: (json['quantity'] as num?)?.toInt() ?? 0,
         pricePerUnit: (json['price_per_unit'] as num?)?.toDouble() ?? 0.0,
+        basePricePerUnit:
+            (json['base_price_per_unit'] as num?)?.toDouble() ?? 0.0,
         totalPrice: (json['total_price'] as num?)?.toDouble() ?? 0.0,
       );
 
@@ -89,6 +100,7 @@ class OrderItem {
         productImageUrl: product.imageUrl,
         quantity: quantity,
         pricePerUnit: product.price,
+        basePricePerUnit: product.basePrice,
         totalPrice: product.price * quantity,
       );
 }
@@ -165,6 +177,9 @@ class Order {
   final String? storeId;
   final String? promoCodeId;
   final String type; // 'Liquor' or 'Food'
+  final double baseSubtotal;
+  final double storeShare;
+  final double quelessShare;
 
   String get orderType => type;
 
@@ -192,6 +207,9 @@ class Order {
     this.storeId,
     this.promoCodeId,
     required this.type,
+    required this.baseSubtotal,
+    required this.storeShare,
+    required this.quelessShare,
   });
 
   Map<String, dynamic> toJson() => {
@@ -218,22 +236,36 @@ class Order {
         'store_id': storeId,
         'promo_code_id': promoCodeId,
         'type': type,
+        'base_subtotal': baseSubtotal,
+        'store_share': storeShare,
+        'queless_share': quelessShare,
       };
 
   factory Order.fromJson(Map<String, dynamic> json) {
     try {
+      // Use local calculations as fallbacks if columns don't exist in DB
+      final subtotal = (json['subtotal'] as num?)?.toDouble() ?? 0.0;
+      final deliveryFee = (json['delivery_fee'] as num?)?.toDouble() ?? 0.0;
+      final discount = (json['discount'] as num?)?.toDouble() ?? 0.0;
+      final total = (json['total'] as num?)?.toDouble() ?? 0.0;
+
+      // Base subtotal fallback: sum of item base prices
+      final itemsList = (json['items'] as List?)
+              ?.map((i) => OrderItem.fromJson(i as Map<String, dynamic>))
+              .toList() ??
+          [];
+      final calculatedBaseSubtotal = itemsList.fold(
+          0.0, (sum, item) => sum + item.basePricePerUnit * item.quantity);
+
       return Order(
         id: json['id']?.toString() ?? '',
         orderNumber: json['order_number']?.toString() ?? '',
         userId: json['user_id']?.toString() ?? '',
-        items: (json['items'] as List?)
-                ?.map((i) => OrderItem.fromJson(i as Map<String, dynamic>))
-                .toList() ??
-            [],
-        subtotal: (json['subtotal'] as num?)?.toDouble() ?? 0.0,
-        deliveryFee: (json['delivery_fee'] as num?)?.toDouble() ?? 0.0,
-        discount: (json['discount'] as num?)?.toDouble() ?? 0.0,
-        total: (json['total'] as num?)?.toDouble() ?? 0.0,
+        items: itemsList,
+        subtotal: subtotal,
+        deliveryFee: deliveryFee,
+        discount: discount,
+        total: total,
         status: OrderStatus.values.firstWhere(
           (e) =>
               e.name.toLowerCase() == json['status']?.toString().toLowerCase(),
@@ -269,6 +301,12 @@ class Order {
         promoCodeId: json['promo_code_id']?.toString(),
         type: json['type']?.toString() ??
             (json['store_id'] != null ? 'Liquor' : 'Food'),
+        baseSubtotal: (json['base_subtotal'] as num?)?.toDouble() ??
+            calculatedBaseSubtotal,
+        storeShare: (json['store_share'] as num?)?.toDouble() ??
+            calculatedBaseSubtotal, // Default store share to base subtotal
+        quelessShare: (json['queless_share'] as num?)?.toDouble() ??
+            (total - calculatedBaseSubtotal),
       );
     } catch (e) {
       debugPrint('Error parsing Order from JSON: $e');
@@ -300,6 +338,9 @@ class Order {
     String? storeId,
     String? promoCodeId,
     String? type,
+    double? baseSubtotal,
+    double? storeShare,
+    double? quelessShare,
   }) =>
       Order(
         id: id ?? this.id,
@@ -326,6 +367,9 @@ class Order {
         storeId: storeId ?? this.storeId,
         promoCodeId: promoCodeId ?? this.promoCodeId,
         type: type ?? this.type,
+        baseSubtotal: baseSubtotal ?? this.baseSubtotal,
+        storeShare: storeShare ?? this.storeShare,
+        quelessShare: quelessShare ?? this.quelessShare,
       );
 
   int get totalItems => items.fold(0, (sum, item) => sum + item.quantity);

@@ -332,8 +332,42 @@ class _BrowseScreenState extends State<BrowseScreen> {
                               product: _filteredProducts[index]),
                         ),
             ),
+            _buildBottomActions(theme),
           ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildBottomActions(ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, -5),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: () => Navigator.of(context).pop(),
+            icon: const Icon(Icons.arrow_back),
+            label: const Text('Back'),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -442,12 +476,41 @@ class _ProductGridItemState extends State<ProductGridItem> {
 
                     return Stack(
                       children: [
-                        Positioned.fill(child: image),
+                        Positioned.fill(
+                          child: Opacity(
+                            opacity: widget.product.isInStock ? 1.0 : 0.5,
+                            child: image,
+                          ),
+                        ),
                         if (promo != null)
                           Positioned(
                             top: 12,
                             left: 12,
                             child: PromoBadge(text: promo.badgeText),
+                          ),
+                        if (!widget.product.isInStock)
+                          Positioned.fill(
+                            child: Container(
+                              color: Colors.black.withOpacity(0.05),
+                              child: Center(
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: theme.colorScheme.error,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    'OUT OF STOCK',
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 10,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
                           ),
                       ],
                     );

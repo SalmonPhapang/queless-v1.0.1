@@ -7,8 +7,7 @@ enum AppEnvironment {
 }
 
 class AppConfig {
-  static final String _env =
-      dotenv.env['APP_ENV'] ?? 'dev';
+  static final String _env = dotenv.env['APP_ENV'] ?? 'dev';
 
   static final bool enableNotifications =
       dotenv.env['ENABLE_NOTIFICATIONS'] == 'true';
@@ -192,10 +191,10 @@ class StagePaystackConfig implements BasePaystackConfig {
 
 class ProdPaystackConfig implements BasePaystackConfig {
   @override
-  String get publicKey => dotenv.env['PAYSTACK_PUBLIC_KEY'] ?? '';
+  String get publicKey => dotenv.env['PAYSTACK_PROD_PUBLIC_KEY'] ?? '';
 
   @override
-  String get secretKey => dotenv.env['PAYSTACK_SECRET_KEY'] ?? '';
+  String get secretKey => dotenv.env['PAYSTACK_PROD_SECRET_KEY'] ?? '';
 
   @override
   String get currency => 'ZAR';

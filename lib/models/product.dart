@@ -67,7 +67,8 @@ class Product {
   final String category;
   final String? brand;
   final String description;
-  final double price;
+  final double basePrice; // Original price from database
+  final double price;     // Price including fee
   final String imageUrl;
   final double? alcoholContent;
   final String? volume;
@@ -85,6 +86,7 @@ class Product {
     required this.category,
     this.brand,
     required this.description,
+    required this.basePrice,
     required this.price,
     required this.imageUrl,
     this.alcoholContent,
@@ -106,7 +108,7 @@ class Product {
         'category': category,
         'brand': brand,
         'description': description,
-        'price': price,
+        'price': basePrice, // Store base price to avoid double-taxing on reload
         'image_url': imageUrl,
         'alcohol_content': alcoholContent,
         'volume': volume,
@@ -119,13 +121,16 @@ class Product {
         'updated_at': updatedAt.toIso8601String(),
       };
 
-  factory Product.fromJson(Map<String, dynamic> json) => Product(
+  factory Product.fromJson(Map<String, dynamic> json) {
+    final double rawPrice = (json['price'] as num).toDouble();
+    return Product(
         id: json['id'] as String,
         name: json['name'] as String,
         category: json['category']?.toString() ?? 'Food',
         brand: json['brand'] as String?,
         description: json['description'] as String? ?? '',
-        price: (json['price'] as num).toDouble() * (1 + feeRate),
+        basePrice: rawPrice,
+        price: rawPrice * (1 + feeRate),
         imageUrl: json['image_url'] as String? ?? '',
         alcoholContent: json['alcohol_content'] != null
             ? (json['alcohol_content'] as num).toDouble()
@@ -143,6 +148,7 @@ class Product {
         createdAt: DateTime.parse(json['created_at'] as String),
         updatedAt: DateTime.parse(json['updated_at'] as String),
       );
+  }
 
   Product copyWith({
     String? id,
@@ -150,6 +156,7 @@ class Product {
     String? category,
     String? brand,
     String? description,
+    double? basePrice,
     double? price,
     String? imageUrl,
     double? alcoholContent,
@@ -168,6 +175,7 @@ class Product {
         category: category ?? this.category,
         brand: brand ?? this.brand,
         description: description ?? this.description,
+        basePrice: basePrice ?? this.basePrice,
         price: price ?? this.price,
         imageUrl: imageUrl ?? this.imageUrl,
         alcoholContent: alcoholContent ?? this.alcoholContent,

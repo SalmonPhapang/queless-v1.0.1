@@ -14,8 +14,14 @@ class StoreService {
 
   Future<List<Store>> getAllStores() async {
     const cacheKey = 'all_stores';
-    final cached = _cache.get<List<Store>>(cacheKey);
-    if (cached != null) return cached;
+    final cachedDynamic = _cache.get<dynamic>(cacheKey);
+    if (cachedDynamic != null && cachedDynamic is List) {
+      return cachedDynamic
+          .map((json) => json is Store
+              ? json
+              : Store.fromJson(json as Map<String, dynamic>))
+          .toList();
+    }
 
     try {
       final data = await SupabaseService.select(
@@ -24,21 +30,34 @@ class StoreService {
         ascending: false,
       );
       final stores = data.map((json) => Store.fromJson(json)).toList();
-      await _cache.set(cacheKey, stores);
+      final storesJson = stores.map((s) => s.toJson()).toList();
+      await _cache.set(cacheKey, storesJson);
       log('✅ Loaded and cached ${stores.length} stores');
       return stores;
     } catch (e) {
       log('❌ Error loading stores: $e');
-      // If network error, return cached data even if get() returned null (maybe it was expired but still exists in memory/prefs)
-      // Actually, my get() returns null if expired. I might want a getIgnoreExpiry() for offline mode.
-      return _cache.get<List<Store>>(cacheKey) ?? [];
+      final cached = _cache.get<dynamic>(cacheKey);
+      if (cached != null && cached is List) {
+        return cached
+            .map((json) => json is Store
+                ? json
+                : Store.fromJson(json as Map<String, dynamic>))
+            .toList();
+      }
+      return [];
     }
   }
 
   Future<List<Store>> getStores({String? category}) async {
     final cacheKey = 'stores_${category ?? 'all'}';
-    final cached = _cache.get<List<Store>>(cacheKey);
-    if (cached != null) return cached;
+    final cachedDynamic = _cache.get<dynamic>(cacheKey);
+    if (cachedDynamic != null && cachedDynamic is List) {
+      return cachedDynamic
+          .map((json) => json is Store
+              ? json
+              : Store.fromJson(json as Map<String, dynamic>))
+          .toList();
+    }
 
     try {
       final Map<String, dynamic> filters = {};
@@ -54,11 +73,20 @@ class StoreService {
       );
 
       final stores = data.map((json) => Store.fromJson(json)).toList();
-      await _cache.set(cacheKey, stores);
+      final storesJson = stores.map((s) => s.toJson()).toList();
+      await _cache.set(cacheKey, storesJson);
       return stores;
     } catch (e) {
       log('❌ Error getting stores: $e');
-      return _cache.get<List<Store>>(cacheKey) ?? [];
+      final cached = _cache.get<dynamic>(cacheKey);
+      if (cached != null && cached is List) {
+        return cached
+            .map((json) => json is Store
+                ? json
+                : Store.fromJson(json as Map<String, dynamic>))
+            .toList();
+      }
+      return [];
     }
   }
 
@@ -77,8 +105,13 @@ class StoreService {
 
   Future<Store?> getStoreById(String id) async {
     final cacheKey = 'store_$id';
-    final cachedStore = _cache.get<Store>(cacheKey);
-    if (cachedStore != null) return cachedStore;
+    final cachedDynamic = _cache.get<dynamic>(cacheKey);
+    if (cachedDynamic != null) {
+      if (cachedDynamic is Store) return cachedDynamic;
+      if (cachedDynamic is Map<String, dynamic>) {
+        return Store.fromJson(cachedDynamic);
+      }
+    }
 
     try {
       final data = await SupabaseService.selectSingle(
@@ -88,12 +121,17 @@ class StoreService {
 
       final store = data != null ? Store.fromJson(data) : null;
       if (store != null) {
-        await _cache.set(cacheKey, store);
+        await _cache.set(cacheKey, store.toJson());
       }
       return store;
     } catch (e) {
       log('❌ Error getting store by id: $e');
-      return _cache.get<Store>(cacheKey);
+      final cached = _cache.get<dynamic>(cacheKey);
+      if (cached != null) {
+        if (cached is Store) return cached;
+        if (cached is Map<String, dynamic>) return Store.fromJson(cached);
+      }
+      return null;
     }
   }
 
@@ -103,9 +141,21 @@ class StoreService {
     double radiusMeters = 5000,
     String? category,
   }) async {
-    final cacheKey = 'nearby_stores_${latitude}_${longitude}_$radiusMeters';
-    final cached = _cache.get<List<Store>>(cacheKey);
-    if (cached != null) return cached;
+    final cacheKey =
+        'nearby_stores_${latitude}_${longitude}_${radiusMeters}_${category ?? 'all'}';
+    final cachedDynamic = _cache.get<dynamic>(cacheKey);
+    if (cachedDynamic != null && cachedDynamic is List) {
+      try {
+        final cachedStores = cachedDynamic.map((json) {
+          if (json is Store) return json;
+          return Store.fromJson(json as Map<String, dynamic>);
+        }).toList();
+        return cachedStores;
+      } catch (e) {
+        Logger.debug('⚠️ Error parsing cached nearby stores: $e');
+        // If parsing fails, fall through to fetch fresh data
+      }
+    }
 
     try {
       if (!ConnectivityService().isConnected) {
@@ -136,11 +186,21 @@ class StoreService {
         stores = stores.where((s) => s.category == category).toList();
       }
 
-      await _cache.set(cacheKey, stores);
+      // Important: Map to JSON before caching for persistent storage consistency
+      final storesJson = stores.map((s) => s.toJson()).toList();
+      await _cache.set(cacheKey, storesJson);
       return stores;
     } catch (e) {
       Logger.debug('❌ Error getting nearby stores via RPC: $e');
-      return _cache.get<List<Store>>(cacheKey) ?? [];
+      final cached = _cache.get<dynamic>(cacheKey);
+      if (cached != null && cached is List) {
+        return cached
+            .map((json) => json is Store
+                ? json
+                : Store.fromJson(json as Map<String, dynamic>))
+            .toList();
+      }
+      return [];
     }
   }
 

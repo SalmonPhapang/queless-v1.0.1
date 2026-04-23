@@ -10,6 +10,7 @@ import 'package:queless/screens/cart/cart_screen.dart';
 import 'package:queless/utils/formatters.dart';
 import 'package:queless/widgets/promo_badge.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:queless/utils/snack_bar_helper.dart';
 
 class StoreDetailScreen extends StatefulWidget {
   final Store store;
@@ -196,26 +197,20 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
   Future<void> _addToCart(Product product) async {
     await _cartService.addItem(product);
     if (mounted) {
-      final theme = Theme.of(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Added to Food Cart'),
-          backgroundColor: theme.colorScheme.secondary,
-          behavior: SnackBarBehavior.floating,
-          width: 280,
-          duration: const Duration(seconds: 4),
-          action: SnackBarAction(
-            label: 'View Cart',
-            textColor: Colors.white,
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const CartScreen(),
-                ),
-              );
-            },
-          ),
+      SnackBarHelper.showSuccess(
+        context,
+        'Added to Food Cart',
+        action: SnackBarAction(
+          label: 'View',
+          textColor: Colors.white,
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const CartScreen(),
+              ),
+            );
+          },
         ),
       );
     }
@@ -227,49 +222,19 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
     final promoService = PromotionService();
 
     return Scaffold(
+      appBar: AppBar(
+        title: Text(widget.store.name),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ),
       body: CustomScrollView(
         slivers: [
-          SliverAppBar(
-            expandedHeight: 200,
-            pinned: true,
-            flexibleSpace: FlexibleSpaceBar(
-              title: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      widget.store.name,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        shadows: [
-                          Shadow(
-                            offset: Offset(0, 1),
-                            blurRadius: 4.0,
-                            color: Colors.black54,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  if (!widget.store.isOpen)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.red.withValues(alpha: 0.8),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: const Text(
-                        'OFFLINE',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-              background: AnimatedBuilder(
+          SliverToBoxAdapter(
+            child: AspectRatio(
+              aspectRatio: 16 / 9,
+              child: AnimatedBuilder(
                 animation: promoService,
                 builder: (context, _) {
                   final promo = promoService.promotionForStore(widget.store.id);
@@ -312,24 +277,32 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
                     fit: StackFit.expand,
                     children: [
                       image,
-                      // Overlay to ensure title readability
-                      const DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [
-                              Colors.transparent,
-                              Colors.black54,
-                            ],
-                          ),
-                        ),
-                      ),
                       if (promo != null)
                         Positioned(
-                          top: MediaQuery.of(context).padding.top + 50,
+                          top: 16,
                           left: 16,
                           child: PromoBadge(text: promo.badgeText),
+                        ),
+                      if (!widget.store.isOpen)
+                        Positioned(
+                          top: 16,
+                          right: 16,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: Colors.red.withOpacity(0.9),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Text(
+                              'OFFLINE',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
                         ),
                     ],
                   );
@@ -458,7 +431,33 @@ class _StoreDetailScreenState extends State<StoreDetailScreen> {
                         ),
                       ),
                     ),
+          SliverToBoxAdapter(
+            child: _buildBottomActions(theme),
+          ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildBottomActions(ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: () => Navigator.of(context).pop(),
+            icon: const Icon(Icons.arrow_back),
+            label: const Text('Back to Stores'),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -716,28 +715,20 @@ class _FoodProductDetailScreenState extends State<FoodProductDetailScreen> {
       await _cartService.addItem(widget.product, quantity: _quantity);
 
       if (mounted) {
-        final theme = Theme.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Added to Food Cart'),
-            backgroundColor: theme.colorScheme.secondary,
-            behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 4),
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            action: SnackBarAction(
-              label: 'View Cart',
-              textColor: Colors.white,
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const CartScreen(),
-                  ),
-                );
-              },
-            ),
+        SnackBarHelper.showSuccess(
+          context,
+          'Added to Food Cart',
+          action: SnackBarAction(
+            label: 'View',
+            textColor: Colors.white,
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const CartScreen(),
+                ),
+              );
+            },
           ),
         );
         Navigator.pop(context, true);
@@ -933,8 +924,11 @@ class _FoodProductDetailScreenState extends State<FoodProductDetailScreen> {
                     offset: const Offset(0, -2))
               ],
             ),
-            child: widget.store.isOpen
-                ? Row(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (widget.store.isOpen)
+                  Row(
                     children: [
                       Container(
                         decoration: BoxDecoration(
@@ -988,7 +982,8 @@ class _FoodProductDetailScreenState extends State<FoodProductDetailScreen> {
                       ),
                     ],
                   )
-                : Container(
+                else
+                  Container(
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     decoration: BoxDecoration(
@@ -1018,6 +1013,23 @@ class _FoodProductDetailScreenState extends State<FoodProductDetailScreen> {
                       ],
                     ),
                   ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.arrow_back),
+                    label: const Text('Back to Stores'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),

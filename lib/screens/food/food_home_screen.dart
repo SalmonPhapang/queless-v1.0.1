@@ -354,37 +354,6 @@ class _FoodHomeScreenState extends State<FoodHomeScreen> {
                           ],
                         ),
                       ),
-                    if (_stores.isNotEmpty &&
-                        _stores.every((s) => (s.distance ?? 0) > 5000))
-                      Container(
-                        margin: const EdgeInsets.only(bottom: 16),
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.secondaryContainer
-                              .withValues(alpha: 0.3),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: theme.colorScheme.secondary
-                                .withValues(alpha: 0.1),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.info_outline_rounded,
-                                color: theme.colorScheme.secondary),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                'No stores within 5km. Showing nearby options within 10km. Delivery fee: R45.',
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: theme.colorScheme.secondary,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
                     _getFilteredStores().isEmpty
                         ? Center(
                             child: Padding(

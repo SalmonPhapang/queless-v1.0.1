@@ -20,11 +20,13 @@ enum OrderTrackingSource {
 class OrderTrackingScreen extends StatefulWidget {
   final String orderId;
   final OrderTrackingSource source;
+  final bool paymentFailed;
 
   const OrderTrackingScreen({
     super.key,
     required this.orderId,
     this.source = OrderTrackingSource.payment,
+    this.paymentFailed = false,
   });
 
   @override
@@ -62,6 +64,14 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
   void initState() {
     super.initState();
     _loadOrder();
+    if (widget.paymentFailed) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        SnackBarHelper.showError(
+          context,
+          'Payment failed or was cancelled. Please try again.',
+        );
+      });
+    }
   }
 
   Future<void> _loadOrder() async {
@@ -109,12 +119,17 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
       Payment? existingPayment =
           await _paymentService.getPaymentByOrderId(_order!.id);
 
-      final payment = existingPayment ??
-          await _paymentService.createPayment(
-            orderId: _order!.id,
-            amount: _order!.total,
-            paymentMethod: method,
-          );
+      Payment payment;
+      if (existingPayment != null) {
+        // Refresh reference for retries to avoid duplicate transaction error in Paystack
+        payment = await _paymentService.refreshPaymentReference(existingPayment.id);
+      } else {
+        payment = await _paymentService.createPayment(
+          orderId: _order!.id,
+          amount: _order!.total,
+          paymentMethod: method,
+        );
+      }
 
       if (method == PaymentMethod.instantEft || method == PaymentMethod.card) {
         if (!mounted) return;
@@ -550,22 +565,26 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
               ),
             ),
             const SizedBox(height: 32),
-            if (_canPayNow())
+            if (_canPayNow)
               Column(
                 children: [
                   SizedBox(
                     width: double.infinity,
-                    child: ElevatedButton(
+                    child: FilledButton.icon(
                       onPressed: _isPaying ? null : _handlePayNow,
-                      child: _isPaying
+                      icon: _isPaying
                           ? const SizedBox(
-                              width: 20,
-                              height: 20,
+                              width: 16,
+                              height: 16,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
+                                color: Colors.white,
                               ),
                             )
-                          : const Text('Pay now'),
+                          : const Icon(Icons.payment),
+                      label: _isPaying
+                          ? const Text('Processing...')
+                          : const Text('Pay Now'),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -594,23 +613,21 @@ class _OrderTrackingScreenState extends State<OrderTrackingScreen> {
     );
   }
 
-  bool _canPayNow() {
+  bool get _canPayNow {
     if (_order == null) return false;
 
-    if (_order!.paymentStatus != PaymentStatus.pending) {
-      return false;
-    }
+    // Cannot pay if order is cancelled
+    if (_order!.status == OrderStatus.cancelled) return false;
 
-    if (_order!.paymentMethod == PaymentMethod.cashOnDelivery.displayName) {
-      return false;
-    }
+    // Cannot pay if already paid
+    if (_order!.paymentStatus == PaymentStatus.completed) return false;
 
-    if (_order!.status != OrderStatus.pending) {
+    // Cannot pay if it's COD
+    if (_order!.paymentMethod == PaymentMethod.cashOnDelivery.displayName)
       return false;
-    }
 
-    final age = DateTime.now().difference(_order!.createdAt);
-    return age <= const Duration(hours: 24);
+    // Allow payment if it's pending or previously failed
+    return true;
   }
 }
 

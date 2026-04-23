@@ -33,6 +33,15 @@ class CartService extends ChangeNotifier {
   int get itemCount => totalItemCount;
 
   double getSubtotal(String storeId) => _carts[storeId]?.subtotal ?? 0.0;
+  double get baseSubtotal {
+    double total = 0.0;
+    for (var cart in _carts.values) {
+      total += cart.baseSubtotal;
+    }
+    return total;
+  }
+
+  double getBaseSubtotal(String storeId) => _carts[storeId]?.baseSubtotal ?? 0.0;
 
   double getDeliveryFee(String storeId) {
     final promo = _appliedPromos[storeId];

@@ -5,6 +5,8 @@ import 'package:queless/screens/auth/age_verification_screen.dart';
 import 'package:queless/screens/auth/permission_request_screen.dart';
 import 'package:queless/screens/main_screen.dart';
 import 'package:queless/screens/onboarding/onboarding_screen.dart';
+import 'package:queless/screens/hms_coming_soon_screen.dart';
+import 'package:queless/services/platform_service.dart';
 import 'package:queless/services/auth_service.dart';
 
 class AuthRouter extends StatefulWidget {
@@ -27,6 +29,12 @@ class _AuthRouterState extends State<AuthRouter> {
 
   Future<void> _determineInitialRoute() async {
     try {
+      // First check platform availability
+      if (PlatformService().isHMS) {
+        _initialRoute = const HMSComingSoonScreen();
+        return;
+      }
+
       final prefs = await SharedPreferences.getInstance();
 
       // Check if user is authenticated via Supabase/AuthService

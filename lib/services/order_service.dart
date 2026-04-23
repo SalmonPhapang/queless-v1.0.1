@@ -8,6 +8,7 @@ import 'package:queless/services/food_cart_service.dart';
 import 'package:queless/services/promo_code_service.dart';
 import 'package:queless/supabase/supabase_config.dart';
 import 'package:queless/utils/id_generator.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class OrderService {
   static final OrderService _instance = OrderService._internal();
@@ -53,14 +54,18 @@ class OrderService {
               productImageUrl: cartItem.productImageUrl,
               quantity: cartItem.quantity,
               pricePerUnit: cartItem.price,
+              basePricePerUnit: cartItem.basePrice,
               totalPrice: cartItem.totalPrice,
             ))
         .toList();
 
     final subtotal = _cartService.getSubtotal(storeId);
+    final baseSubtotal = _cartService.getBaseSubtotal(storeId);
     final deliveryFee = _cartService.getDeliveryFee(storeId);
     final discount = _cartService.calculateDiscount(storeId);
     final total = _cartService.calculateTotal(storeId);
+    final storeShare = baseSubtotal;
+    final quelessShare = total - storeShare;
     final promoCodeId = _cartService.getAppliedPromo(storeId)?.id;
     final orderNumber = IdGenerator.generateOrderNumber();
 
@@ -95,11 +100,17 @@ class OrderService {
     };
 
     try {
+      Logger.debug('Attempting to insert order into Supabase: $orderData');
       final result = await SupabaseService.insert('orders', orderData);
+      Logger.debug('Supabase insert result: $result');
 
       // Increment promo usage if applicable
       if (promoCodeId != null) {
-        await PromoCodeService().incrementUsage(promoCodeId);
+        try {
+          await PromoCodeService().incrementUsage(promoCodeId);
+        } catch (e) {
+          Logger.debug('Error incrementing promo usage (non-fatal): $e');
+        }
       }
 
       await _cartService.clear(storeId);
@@ -108,7 +119,11 @@ class OrderService {
       _invalidateCache(null); // Invalidate user list cache
       return order;
     } catch (e) {
-      Logger.debug('Error creating order: $e');
+      Logger.debug('CRITICAL Error creating order: $e');
+      if (e is PostgrestException) {
+        Logger.debug(
+            'Postgrest Error Details: ${e.message}, ${e.details}, ${e.hint}');
+      }
       rethrow;
     }
   }
@@ -136,15 +151,19 @@ class OrderService {
             productImageUrl: cartItem.productImageUrl,
             quantity: cartItem.quantity,
             pricePerUnit: cartItem.price,
+            basePricePerUnit: cartItem.basePrice,
             totalPrice: cartItem.totalPrice,
           ),
         )
         .toList();
 
     final subtotal = _foodCartService.getSubtotal(storeId);
+    final baseSubtotal = _foodCartService.getBaseSubtotal(storeId);
     final deliveryFee = _foodCartService.getDeliveryFee(storeId);
     final discount = _foodCartService.calculateDiscount(storeId);
     final total = _foodCartService.calculateTotal(storeId);
+    final storeShare = baseSubtotal;
+    final quelessShare = total - storeShare;
     final promoCodeId = _foodCartService.getAppliedPromo(storeId)?.id;
     final orderNumber = IdGenerator.generateOrderNumber();
 
@@ -176,11 +195,17 @@ class OrderService {
     };
 
     try {
+      Logger.debug('Attempting to insert food order into Supabase: $orderData');
       final result = await SupabaseService.insert('orders', orderData);
+      Logger.debug('Supabase food insert result: $result');
 
       // Increment promo usage if applicable
       if (promoCodeId != null) {
-        await PromoCodeService().incrementUsage(promoCodeId);
+        try {
+          await PromoCodeService().incrementUsage(promoCodeId);
+        } catch (e) {
+          Logger.debug('Error incrementing food promo usage (non-fatal): $e');
+        }
       }
 
       await _foodCartService.clear(storeId);
@@ -189,7 +214,11 @@ class OrderService {
       _invalidateCache(null); // Invalidate user list cache
       return order;
     } catch (e) {
-      Logger.debug('Error creating food order: $e');
+      Logger.debug('CRITICAL Error creating food order: $e');
+      if (e is PostgrestException) {
+        Logger.debug(
+            'Postgrest Error Details: ${e.message}, ${e.details}, ${e.hint}');
+      }
       rethrow;
     }
   }
@@ -199,8 +228,21 @@ class OrderService {
     if (user == null) return [];
 
     final cacheKey = 'user_orders_${user.id}';
-    final cached = _cache.get<List<Order>>(cacheKey);
-    if (cached != null) return cached;
+    final cachedDynamic = _cache.get<dynamic>(cacheKey);
+    if (cachedDynamic != null && cachedDynamic is List) {
+      return cachedDynamic
+          .map((item) {
+            try {
+              if (item is Order) return item;
+              if (item is Map<String, dynamic>) return Order.fromJson(item);
+              return null;
+            } catch (e) {
+              return null;
+            }
+          })
+          .whereType<Order>()
+          .toList();
+    }
 
     try {
       final data = await SupabaseService.select(
@@ -232,7 +274,22 @@ class OrderService {
       return orders;
     } catch (e) {
       Logger.debug('Error getting user orders: $e');
-      return _cache.get<List<Order>>(cacheKey) ?? [];
+      final cachedDynamic = _cache.get<dynamic>(cacheKey);
+      if (cachedDynamic != null && cachedDynamic is List) {
+        return cachedDynamic
+            .map((item) {
+              try {
+                if (item is Order) return item;
+                if (item is Map<String, dynamic>) return Order.fromJson(item);
+                return null;
+              } catch (e) {
+                return null;
+              }
+            })
+            .whereType<Order>()
+            .toList();
+      }
+      return [];
     }
   }
 
@@ -256,8 +313,13 @@ class OrderService {
 
   Future<Order?> getOrderById(String orderId) async {
     final cacheKey = 'order_$orderId';
-    final cachedOrder = _cache.get<Order>(cacheKey);
-    if (cachedOrder != null) return cachedOrder;
+    final cachedDynamic = _cache.get<dynamic>(cacheKey);
+    if (cachedDynamic != null) {
+      if (cachedDynamic is Order) return cachedDynamic;
+      if (cachedDynamic is Map<String, dynamic>) {
+        return Order.fromJson(cachedDynamic);
+      }
+    }
 
     try {
       final data = await SupabaseService.selectSingle(
@@ -272,14 +334,18 @@ class OrderService {
       return order;
     } catch (e) {
       Logger.debug('Error getting order by id: $e');
-      return _cache.get<Order>(cacheKey);
+      final cachedDynamic = _cache.get<dynamic>(cacheKey);
+      if (cachedDynamic != null && cachedDynamic is Map<String, dynamic>) {
+        return Order.fromJson(cachedDynamic);
+      }
+      return null;
     }
   }
 
   Future<void> updateOrderStatus(String orderId, OrderStatus status) async {
     try {
       final order = await getOrderById(orderId);
-      if (order == null) return;
+      if (order == null || order.status == status) return;
 
       final trackingUpdates = List<TrackingUpdate>.from(order.trackingUpdates);
       final now = DateTime.now();
@@ -334,6 +400,9 @@ class OrderService {
     PaymentStatus paymentStatus,
   ) async {
     try {
+      final order = await getOrderById(orderId);
+      if (order == null || order.paymentStatus == paymentStatus) return;
+
       final now = DateTime.now();
       final updateData = <String, dynamic>{
         'payment_status': paymentStatus.name,
@@ -355,7 +424,8 @@ class OrderService {
     final cutoff = DateTime.now().subtract(const Duration(hours: 24));
 
     for (final order in orders) {
-      if (order.status == OrderStatus.pending &&
+      if ((order.status == OrderStatus.pending ||
+              order.status == OrderStatus.awaitingPayment) &&
           order.createdAt.isBefore(cutoff)) {
         await updateOrderStatus(order.id, OrderStatus.cancelled);
       }
@@ -363,7 +433,8 @@ class OrderService {
   }
 
   bool _isPendingOlderThan24Hours(Order order) {
-    if (order.status != OrderStatus.pending) return false;
+    if (order.status != OrderStatus.pending &&
+        order.status != OrderStatus.awaitingPayment) return false;
     final cutoff = DateTime.now().subtract(const Duration(hours: 24));
     return order.createdAt.isBefore(cutoff);
   }
@@ -372,6 +443,8 @@ class OrderService {
     switch (status) {
       case OrderStatus.pending:
         return 'Order placed successfully';
+      case OrderStatus.awaitingPayment:
+        return 'Awaiting payment from customer';
       case OrderStatus.confirmed:
         return 'Order confirmed and being prepared';
       case OrderStatus.preparing:
@@ -382,6 +455,8 @@ class OrderService {
         return 'Order delivered successfully';
       case OrderStatus.cancelled:
         return 'Order cancelled';
+      default:
+        return 'Unknown status';
     }
   }
 }

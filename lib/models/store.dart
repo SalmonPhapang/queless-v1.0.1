@@ -24,6 +24,7 @@ class Store {
   final double? distance; // distance in meters, only set when searching nearby
 
   final bool isApproved;
+  final String? subaccountCode;
 
   Store({
     required this.id,
@@ -49,6 +50,7 @@ class Store {
     this.nextOpeningTime,
     this.distance,
     this.isApproved = true,
+    this.subaccountCode,
   });
 
   Map<String, dynamic> toJson() => {
@@ -75,6 +77,7 @@ class Store {
         'next_opening_time': nextOpeningTime,
         'distance': distance,
         'is_approved': isApproved,
+        'subaccount_code': subaccountCode,
       };
 
   factory Store.fromJson(Map<String, dynamic> json) => Store(
@@ -104,6 +107,7 @@ class Store {
         nextOpeningTime: json['next_opening_time'] as String?,
         distance: (json['distance'] as num?)?.toDouble(),
         isApproved: json['is_approved'] as bool? ?? true,
+        subaccountCode: json['subaccount_code'] as String?,
       );
 
   Store copyWith({
@@ -130,6 +134,7 @@ class Store {
     String? nextOpeningTime,
     double? distance,
     bool? isApproved,
+    String? subaccountCode,
   }) {
     return Store(
       id: id ?? this.id,
@@ -155,6 +160,7 @@ class Store {
       nextOpeningTime: nextOpeningTime ?? this.nextOpeningTime,
       distance: distance ?? this.distance,
       isApproved: isApproved ?? this.isApproved,
+      subaccountCode: subaccountCode ?? this.subaccountCode,
     );
   }
 }

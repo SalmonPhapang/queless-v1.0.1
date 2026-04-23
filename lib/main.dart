@@ -15,6 +15,7 @@ import 'package:queless/services/auth_service.dart';
 import 'package:queless/services/cart_service.dart';
 import 'package:queless/services/food_cart_service.dart';
 import 'package:queless/services/order_service.dart';
+import 'package:queless/services/platform_service.dart';
 import 'package:queless/services/theme_service.dart';
 import 'package:queless/services/cache_service.dart';
 import 'package:queless/services/connectivity_service.dart';
@@ -23,6 +24,7 @@ import 'package:queless/router/auth_router.dart';
 import 'package:queless/utils/database_test.dart';
 import 'package:queless/config/app_config.dart';
 import 'package:queless/screens/orders/order_tracking_screen.dart';
+import 'package:queless/services/app_update_service.dart';
 
 final FlutterLocalNotificationsPlugin _localNotifications =
     FlutterLocalNotificationsPlugin();
@@ -258,7 +260,8 @@ Future<void> main() async {
   await SupabaseConfig.initialize();
   await ConnectivityService().initialize();
   await CacheService().init();
-  Logger.debug('✅ Supabase, Connectivity and Cache initialized');
+  await PlatformService().init();
+  Logger.debug('✅ Supabase, Connectivity, Cache and Platform initialized');
 
   try {
     await DatabaseTest().runAllTests();
@@ -340,6 +343,8 @@ Future<void> main() async {
 
   Logger.debug('✅ All services initialized');
 
+  AppUpdateService().checkForUpdate();
+
   runApp(const MyApp());
 }
 
@@ -351,6 +356,8 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
+  final _appUpdateService = AppUpdateService();
+
   @override
   void initState() {
     super.initState();
@@ -362,6 +369,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _applyFullscreenSystemUi();
+      _appUpdateService.showUpdateDialogIfNeeded(_navigatorKey.currentContext!);
     }
   }
 

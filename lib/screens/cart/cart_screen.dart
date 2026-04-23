@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:queless/models/store.dart';
 import 'package:queless/models/cart.dart';
 import 'package:queless/services/cart_service.dart';
@@ -165,11 +166,31 @@ class _CartScreenState extends State<CartScreen> {
                       theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(
-                  isFood ? Icons.fastfood : Icons.local_bar,
-                  color: theme.colorScheme.primary,
-                  size: 30,
-                ),
+                child: store?.imageUrl != null && store!.imageUrl.isNotEmpty
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: CachedNetworkImage(
+                          imageUrl: store.imageUrl,
+                          fit: BoxFit.cover,
+                          placeholder: (context, url) => Center(
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: theme.colorScheme.primary
+                                  .withValues(alpha: 0.3),
+                            ),
+                          ),
+                          errorWidget: (context, url, error) => Icon(
+                            isFood ? Icons.fastfood : Icons.local_bar,
+                            color: theme.colorScheme.primary,
+                            size: 30,
+                          ),
+                        ),
+                      )
+                    : Icon(
+                        isFood ? Icons.fastfood : Icons.local_bar,
+                        color: theme.colorScheme.primary,
+                        size: 30,
+                      ),
               ),
               const SizedBox(width: 16),
               Expanded(

@@ -56,7 +56,13 @@ class PromotionService extends ChangeNotifier {
 
       await _cache.set(cacheKey, _activePromotions);
     } catch (_) {
-      _activePromotions = _cache.get<List<Promotion>>(cacheKey) ?? [];
+      final cachedDynamic = _cache.get<dynamic>(cacheKey);
+      if (cachedDynamic != null && cachedDynamic is List) {
+        _activePromotions =
+            cachedDynamic.map((json) => Promotion.fromJson(json)).toList();
+      } else {
+        _activePromotions = [];
+      }
     } finally {
       _isLoading = false;
       // Defer notification to avoid "setState() called during build" errors

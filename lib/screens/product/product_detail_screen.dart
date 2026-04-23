@@ -8,6 +8,7 @@ import 'package:queless/services/auth_service.dart';
 import 'package:queless/services/promotion_service.dart';
 import 'package:queless/utils/formatters.dart';
 import 'package:queless/screens/cart/cart_screen.dart';
+import 'package:queless/utils/snack_bar_helper.dart';
 import 'package:queless/widgets/promo_badge.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
@@ -67,40 +68,27 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       }
 
       if (mounted) {
-        final theme = Theme.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content:
-                Text(isFood ? 'Added to Food Cart' : 'Added to Alcohol Cart'),
-            backgroundColor: theme.colorScheme.secondary,
-            behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 4),
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            action: SnackBarAction(
-              label: 'View Cart',
-              textColor: Colors.white,
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const CartScreen(),
-                  ),
-                );
-              },
-            ),
+        SnackBarHelper.showSuccess(
+          context,
+          isFood ? 'Added to Food Cart' : 'Added to Alcohol Cart',
+          action: SnackBarAction(
+            label: 'View',
+            textColor: Colors.white,
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const CartScreen(),
+                ),
+              );
+            },
           ),
         );
         Navigator.pop(context, true);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(e.toString()),
-              backgroundColor: Theme.of(context).colorScheme.error),
-        );
+        SnackBarHelper.showError(context, e.toString());
       }
     } finally {
       if (mounted) setState(() => _isAdding = false);
@@ -121,6 +109,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
         actions: [
           IconButton(
             icon: Icon(isFavorite ? Icons.favorite : Icons.favorite_border),
@@ -350,99 +342,121 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             ),
             child: _isLoadingStore
                 ? const Center(child: CircularProgressIndicator())
-                : (_store?.isOpen ?? true) && widget.product.isInStock
-                    ? Row(
-                        children: [
-                          Container(
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.surfaceContainerHighest,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Row(
-                              children: [
-                                IconButton(
-                                    icon: const Icon(Icons.remove),
-                                    onPressed: _quantity > 1
-                                        ? () => setState(() => _quantity--)
-                                        : null),
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 12),
-                                  child: Text('$_quantity',
-                                      style: theme.textTheme.titleMedium
-                                          ?.copyWith(
-                                              fontWeight: FontWeight.bold)),
-                                ),
-                                IconButton(
-                                    icon: const Icon(Icons.add),
-                                    onPressed: () =>
-                                        setState(() => _quantity++)),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: _isAdding ? null : _addToCart,
-                              icon: _isAdding
-                                  ? const SizedBox(
-                                      height: 20,
-                                      width: 20,
-                                      child: CircularProgressIndicator(
-                                          strokeWidth: 2))
-                                  : const Icon(Icons.shopping_cart_outlined),
-                              label: _isAdding
-                                  ? const SizedBox.shrink()
-                                  : FittedBox(
-                                      fit: BoxFit.scaleDown,
-                                      child: Text(
-                                        'Add • ${Formatters.formatCurrency(widget.product.price * _quantity)}',
-                                        maxLines: 1,
-                                        style: const TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
-                            ),
-                          ),
-                        ],
-                      )
-                    : Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.errorContainer
-                              .withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color:
-                                theme.colorScheme.error.withValues(alpha: 0.2),
-                          ),
-                        ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
+                : Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if ((_store?.isOpen ?? true) && widget.product.isInStock)
+                        Row(
                           children: [
-                            Text(
-                              !widget.product.isInStock
-                                  ? 'Item Out of Stock'
-                                  : 'Store is currently offline',
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                color: theme.colorScheme.error,
-                                fontWeight: FontWeight.bold,
+                            Container(
+                              decoration: BoxDecoration(
+                                color:
+                                    theme.colorScheme.surfaceContainerHighest,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Row(
+                                children: [
+                                  IconButton(
+                                      icon: const Icon(Icons.remove),
+                                      onPressed: _quantity > 1
+                                          ? () => setState(() => _quantity--)
+                                          : null),
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 12),
+                                    child: Text('$_quantity',
+                                        style: theme.textTheme.titleMedium
+                                            ?.copyWith(
+                                                fontWeight: FontWeight.bold)),
+                                  ),
+                                  IconButton(
+                                      icon: const Icon(Icons.add),
+                                      onPressed: () =>
+                                          setState(() => _quantity++)),
+                                ],
                               ),
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              !widget.product.isInStock
-                                  ? 'Check back later for restock'
-                                  : _store?.nextOpeningTime ??
-                                      'Will open tomorrow at 9am',
-                              style: theme.textTheme.bodySmall,
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                onPressed: _isAdding ? null : _addToCart,
+                                icon: _isAdding
+                                    ? const SizedBox(
+                                        height: 20,
+                                        width: 20,
+                                        child: CircularProgressIndicator(
+                                            strokeWidth: 2))
+                                    : const Icon(Icons.shopping_cart_outlined),
+                                label: _isAdding
+                                    ? const SizedBox.shrink()
+                                    : FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        child: Text(
+                                          'Add • ${Formatters.formatCurrency(widget.product.price * _quantity)}',
+                                          maxLines: 1,
+                                          style: const TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                              ),
                             ),
                           ],
+                        )
+                      else
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.errorContainer
+                                .withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: theme.colorScheme.error
+                                  .withValues(alpha: 0.2),
+                            ),
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                !widget.product.isInStock
+                                    ? 'Item Out of Stock'
+                                    : 'Store is currently offline',
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  color: theme.colorScheme.error,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                !widget.product.isInStock
+                                    ? 'Check back later for restock'
+                                    : _store?.nextOpeningTime ??
+                                        'Will open tomorrow at 9am',
+                                style: theme.textTheme.bodySmall,
+                              ),
+                            ],
+                          ),
+                        ),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: () => Navigator.of(context).pop(),
+                          icon: const Icon(Icons.arrow_back),
+                          label: const Text('Back'),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
                         ),
                       ),
+                    ],
+                  ),
           ),
         ],
       ),
